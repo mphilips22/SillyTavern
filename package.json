@@ -111,7 +111,7 @@
     },
     "version": "1.12.14",
     "scripts": {
-        "start": "BIND=0.0.0.0 PORT=3000 node server.js",
+       "start": "cross-env BIND=0.0.0.0 PORT=3000 node server.js",
         "debug": "node --inspect server.js",
         "start:electron": "cd ./src/electron && npm run start",
         "start:deno": "deno run --allow-run --allow-net --allow-read --allow-write --allow-sys --allow-env server.js",
