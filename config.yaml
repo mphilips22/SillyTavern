@@ -3,7 +3,7 @@
 dataRoot: ./data
 # -- SERVER CONFIGURATION --
 # Listen for incoming connections
-listen: false
+listen: true
 # Listen on a specific address, supports IPv4 and IPv6
 listenAddress:
   ipv4: 0.0.0.0
@@ -21,7 +21,7 @@ dnsPreferIPv6: false
 # - Use options like 'localhost', 'st.example.com'
 autorunHostname: "auto"
 # Server port
-port: 8000
+port: 3000
 # Overrides the port for autorun in browser.
 # - Use -1 to use the server port.
 # - Specify a port to override the default.
