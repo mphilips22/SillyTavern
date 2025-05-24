@@ -206,6 +206,34 @@ function applyTagsFromMessage(text) {
     save();
 }
 
+function scanSceneList(text) {
+    if (!text) return;
+    ensurePlayer();
+    const lines = String(text).split(/\r?\n/);
+    let start = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (/^\s*Scene(?: objects)?:\s*$/i.test(lines[i].trim())) {
+            store().player.sceneObjects = [];
+            start = i + 1;
+            break;
+        }
+    }
+    if (start === -1) return;
+    const bulletRe = /^\s*[\u2022*-]\s*(.+)$/;
+    const p = store().player;
+    for (let i = start; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line.trim()) break;
+        const m = bulletRe.exec(line);
+        if (!m) break;
+        let item = m[1].trim().replace(/[.,;!?]+$/g, '').trim();
+        if (item) p.sceneObjects.push(item);
+    }
+    updateHUD();
+    window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+    save();
+}
+
 function handleRenderedMessage(id) {
     const mes = chat[id];
     if (!mes) return;
@@ -214,6 +242,7 @@ function handleRenderedMessage(id) {
     if (processedMessages.has(id)) return;
     if (!mes.is_user) {
         applyTagsFromMessage(mes.mes);
+        scanSceneList(mes.mes);
         processedMessages.add(id);
     }
 }
@@ -229,6 +258,10 @@ eventSource.on(event_types.APP_READY, () => {
 });
 eventSource.on(event_types.CHAT_CHANGED, highlightAll);
 eventSource.on(event_types.CHAT_CHANGED, () => processedMessages.clear());
+eventSource.on(event_types.CHAT_CHANGED, () => {
+    store().player.sceneObjects = [];
+    updateHUD();
+});
 
 SlashCommandParser.addCommandObject(
     SlashCommand.fromProps({
@@ -289,6 +322,23 @@ SlashCommandParser.addCommandObject(
         },
         helpString: 'Take item from scene',
         rawQuotes: true,
+    }),
+);
+
+SlashCommandParser.addCommandObject(
+    SlashCommand.fromProps({
+        name: 'sceneclear',
+        aliases: ['clrs', 'scenereset'],
+        callback: () => {
+            const p = store().player;
+            p.sceneObjects.length = 0;
+            updateHUD();
+            window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+            save();
+            postSystemMessage('[SYSTEM] Scene list cleared');
+            return '';
+        },
+        helpString: 'Clear scene object list',
     }),
 );
 
