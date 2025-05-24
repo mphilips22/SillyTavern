@@ -37,7 +37,14 @@ function d6_13() {
 function ensurePlayer() {
     const st = store();
     if (st.player) return;
-    st.player = { STR: d6_13(), DEX: d6_13(), INT: d6_13(), MP: 20, MaxMP: 20 };
+    st.player = {
+        STR: d6_13(),
+        DEX: d6_13(),
+        INT: d6_13(),
+        MP: 20,
+        MaxMP: 20,
+        sceneObjects: [],
+    };
     st.player.MaxHP = st.player.HP =
         16 + ((st.player.STR + st.player.DEX) >> 2);
     save();
@@ -111,6 +118,25 @@ function applyTagsFromMessage(text) {
     save();
 }
 
+function scanSceneList(text) {
+    if (!text) return;
+    const lines = String(text).split(/\r?\n/);
+    const start = lines.findIndex((l) => /^Scene( objects)?:/i.test(l.trim()));
+    if (start === -1) return;
+    ensurePlayer();
+    const objects = (store().player.sceneObjects ??= []);
+    for (let i = start + 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line === '') break;
+        const match = /^\s*[•*-]\s*(.+)/.exec(line);
+        if (!match) continue;
+        const obj = match[1].trim().replace(/[.,;!?]+$/, '');
+        if (obj && !objects.includes(obj)) objects.push(obj);
+    }
+    if (typeof globalThis.updateHUD === 'function') globalThis.updateHUD();
+    eventSource.emit('statkeeper:update');
+}
+
 function handleRenderedMessage(id) {
     const mes = chat[id];
     if (!mes) return;
@@ -119,6 +145,7 @@ function handleRenderedMessage(id) {
     if (processedMessages.has(id)) return;
     if (!mes.is_user) {
         applyTagsFromMessage(mes.mes);
+        scanSceneList(mes.mes);
         processedMessages.add(id);
     }
 }
