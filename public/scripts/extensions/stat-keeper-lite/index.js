@@ -7,6 +7,7 @@ import {
     characters,
     this_chid,
     getThumbnailUrl,
+    sendMessageAsUser,
 } from '../../../script.js';
 import { extension_settings } from '../../extensions.js';
 import { SlashCommand } from '../../slash-commands/SlashCommand.js';
@@ -80,10 +81,25 @@ function highlightTags(element) {
 }
 
 function hideSyncMessages() {
-    document.querySelectorAll('#chat .mes_text .skl-hidden').forEach((span) => {
-        const mes = span.closest('.mes');
-        if (mes) mes.classList.add('skl-hidden-message');
-    });
+    document
+        .querySelectorAll(
+            '#chat .mes_text .skl-hidden, #chat .mes_text .custom-skl-hidden',
+        )
+        .forEach((span) => {
+            const mes = span.closest('.mes');
+            if (!mes) return;
+            const mesText = mes.querySelector('.mes_text');
+            if (!mesText) return;
+            if (
+                mesText.children.length === 1 &&
+                mesText.textContent.trim() === span.textContent.trim()
+            ) {
+                mes.classList.add('skl-hidden-message');
+                if (span.classList.contains('custom-skl-hidden')) {
+                    mes.classList.add('custom-skl-hidden-message');
+                }
+            }
+        });
 }
 
 function highlightAll() {
@@ -421,6 +437,8 @@ SlashCommandParser.addCommandObject(
                 window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
                 save();
                 pushSync(p.sceneObjects, p.inventory);
+                sendMessageAsUser(`I take ${fullText}`, '');
+                postSystemMessage('[SYSTEM] ' + fullText + ' taken.');
             } else {
                 postSystemMessage(`[SYSTEM] '${itemName}' not found`);
             }
@@ -448,6 +466,7 @@ SlashCommandParser.addCommandObject(
                 updateHUD();
                 save();
                 pushSync(p.sceneObjects, p.inventory);
+                sendMessageAsUser(`I drop ${fullText}`, '');
                 postSystemMessage('[SYSTEM] ' + fullText + ' dropped.');
             } else {
                 postSystemMessage(`[SYSTEM] '${arg}' not in inventory`);
