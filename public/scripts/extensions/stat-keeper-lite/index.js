@@ -258,6 +258,29 @@ function scanSceneList(text) {
 }
 
 const takeRe = /\b(?:take|grab|pick\s+up|pocket|stash|add)\b[\s-]*(.+?)(?:\bto\b|\binto\b|\bin\b|\bmy\b|\bpack\b|\bbackpack\b|$)/i;
+const dropRe = /\b(?:drop|discard|give|remove|put\s+down)\b[\s-]*(.+?)(?:\bfrom\b|\bto\b|\bmy\b|\binventory\b|\bpack\b|\bbackpack\b|$)/i;
+
+function autoDropFromUser(text) {
+    if (!text) return false;
+    const m = dropRe.exec(text);
+    if (!m) return false;
+    const want = canonical(m[1]);
+    ensurePlayer();
+    const p = store().player;
+    const cands = p.inventory.filter((o) => canonical(o) === want);
+    if (cands.length === 1) {
+        const item = cands[0];
+        const idx = p.inventory.indexOf(item);
+        if (idx >= 0) p.inventory.splice(idx, 1);
+        p.sceneObjects.push(item);
+        updateHUD();
+        save();
+        pushSync(p.sceneObjects, p.inventory);
+        postSystemMessage('[SYSTEM] ' + item + ' dropped.');
+        return true;
+    }
+    return false;
+}
 
 function autoTakeFromUser(text) {
     if (!text) return;
@@ -273,7 +296,6 @@ function autoTakeFromUser(text) {
         if (idx >= 0) p.sceneObjects.splice(idx, 1);
         p.inventory.push(item);
         updateHUD();
-        window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
         save();
         pushSync(p.sceneObjects, p.inventory);
         postSystemMessage('[SYSTEM] ' + item + ' taken.');
@@ -296,7 +318,9 @@ function handleRenderedMessage(id) {
 eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, handleRenderedMessage);
 eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => {
     const mes = chat[id];
-    if (mes?.is_user) autoTakeFromUser(mes.mes);
+    if (mes?.is_user) {
+        if (!autoDropFromUser(mes.mes)) autoTakeFromUser(mes.mes);
+    }
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
 });
@@ -338,6 +362,23 @@ SlashCommandParser.addCommandObject(
 
 SlashCommandParser.addCommandObject(
     SlashCommand.fromProps({
+        name: 'invclear',
+        aliases: ['bagclear'],
+        callback: () => {
+            const p = store().player;
+            p.inventory.length = 0;
+            updateHUD();
+            save();
+            pushSync(p.sceneObjects, p.inventory);
+            postSystemMessage('[SYSTEM] Inventory cleared');
+            return '';
+        },
+        helpString: 'Clear inventory list',
+    }),
+);
+
+SlashCommandParser.addCommandObject(
+    SlashCommand.fromProps({
         name: 'scene',
         callback: () => {
             ensurePlayer();
@@ -370,6 +411,34 @@ SlashCommandParser.addCommandObject(
             return '';
         },
         helpString: 'Take item from scene',
+        rawQuotes: true,
+    }),
+);
+
+SlashCommandParser.addCommandObject(
+    SlashCommand.fromProps({
+        name: 'drop',
+        aliases: ['give', 'discard'],
+        callback: (_, arg) => {
+            ensurePlayer();
+            const p = store().player;
+            const want = canonical(typeof arg === 'string' ? arg.trim() : '');
+            const matches = p.inventory.filter((o) => canonical(o) === want);
+            if (matches.length === 1) {
+                const fullText = matches[0];
+                const idx = p.inventory.indexOf(fullText);
+                if (idx >= 0) p.inventory.splice(idx, 1);
+                p.sceneObjects.push(fullText);
+                updateHUD();
+                save();
+                pushSync(p.sceneObjects, p.inventory);
+                postSystemMessage('[SYSTEM] ' + fullText + ' dropped.');
+            } else {
+                postSystemMessage(`[SYSTEM] '${arg}' not in inventory`);
+            }
+            return '';
+        },
+        helpString: 'Drop item from inventory',
         rawQuotes: true,
     }),
 );
