@@ -20,6 +20,8 @@ const colorFor = (k, n) =>
             ? '#1f4e79'
             : '#3498db';
 
+const processedMessages = new Set();
+
 function store() {
     return (extension_settings[SLOT] ??= {});
 }
@@ -47,6 +49,7 @@ function clamp(v, m) {
 
 function highlightTags(element) {
     if (!element) return;
+    if (element.querySelector('.sklTag')) return;
     element.innerHTML = element.innerHTML.replace(TAG, (m, k, n) => {
         const val = Number(n);
         return `<span class="sklTag" style="color:${colorFor(k.toUpperCase(), val)}">${m}</span>`;
@@ -109,7 +112,11 @@ function handleRenderedMessage(id) {
     if (!mes) return;
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
-    if (!mes.is_user) applyTagsFromMessage(mes.mes);
+    if (processedMessages.has(id)) return;
+    if (!mes.is_user) {
+        applyTagsFromMessage(mes.mes);
+        processedMessages.add(id);
+    }
 }
 
 eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, handleRenderedMessage);
