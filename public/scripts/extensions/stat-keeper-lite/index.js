@@ -63,6 +63,13 @@ function clamp(v, m) {
     return Math.max(0, Math.min(m, v));
 }
 
+function canonical(item) {
+    return String(item ?? '')
+        .toLowerCase()
+        .split(/[,(–]/)[0]
+        .trim();
+}
+
 function highlightTags(element) {
     if (!element) return;
     if (element.querySelector('.sklTag')) return;
@@ -234,6 +241,53 @@ function scanSceneList(text) {
     save();
 }
 
+const dropRe = /\b(?:drop|place|put|set|lay|leave|toss)\b[^a-zA-Z]*(.+?)(?:\bdown\b|\bon(?:to)?\b|\bupon\b|\bground\b|\btable\b|\bfloor\b)/i;
+const takeRe = /\b(?:take|grab|pick\s+up|pocket|stash|add)\b[^a-zA-Z]*(.+?)(?:\b(?:in|into|inside|pack|bag|inventory)\b|$)/i;
+
+function autoDropFromUser(text) {
+    if (!text) return false;
+    const m = dropRe.exec(text);
+    if (!m) return false;
+    const want = canonical(m[1]);
+    ensurePlayer();
+    const p = store().player;
+    const cands = p.inventory.filter((o) => canonical(o) === want);
+    if (cands.length === 1) {
+        const item = cands[0];
+        const idx = p.inventory.indexOf(item);
+        if (idx >= 0) p.inventory.splice(idx, 1);
+        p.sceneObjects.push(item);
+        updateHUD();
+        window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+        save();
+        postSystemMessage('[SYSTEM] ' + item + ' dropped.');
+        return true;
+    }
+    return false;
+}
+
+function autoTakeFromUser(text) {
+    if (!text) return false;
+    const m = takeRe.exec(text);
+    if (!m) return false;
+    const want = canonical(m[1]);
+    ensurePlayer();
+    const p = store().player;
+    const cands = p.sceneObjects.filter((o) => canonical(o) === want);
+    if (cands.length === 1) {
+        const item = cands[0];
+        const idx = p.sceneObjects.indexOf(item);
+        if (idx >= 0) p.sceneObjects.splice(idx, 1);
+        p.inventory.push(item);
+        updateHUD();
+        window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+        save();
+        postSystemMessage('[SYSTEM] ' + item + ' taken.');
+        return true;
+    }
+    return false;
+}
+
 function handleRenderedMessage(id) {
     const mes = chat[id];
     if (!mes) return;
@@ -249,6 +303,8 @@ function handleRenderedMessage(id) {
 
 eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, handleRenderedMessage);
 eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => {
+    const mes = chat[id];
+    if (mes?.is_user && !autoDropFromUser(mes.mes)) autoTakeFromUser(mes.mes);
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
 });
@@ -321,6 +377,34 @@ SlashCommandParser.addCommandObject(
             return '';
         },
         helpString: 'Take item from scene',
+        rawQuotes: true,
+    }),
+);
+
+SlashCommandParser.addCommandObject(
+    SlashCommand.fromProps({
+        name: 'drop',
+        aliases: ['give', 'discard'],
+        callback: (_, arg) => {
+            ensurePlayer();
+            const p = store().player;
+            const want = canonical(typeof arg === 'string' ? arg : '');
+            const cands = p.inventory.filter((o) => canonical(o) === want);
+            if (cands.length === 1) {
+                const item = cands[0];
+                const idx = p.inventory.indexOf(item);
+                if (idx >= 0) p.inventory.splice(idx, 1);
+                p.sceneObjects.push(item);
+                updateHUD();
+                window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+                save();
+                postSystemMessage('[SYSTEM] ' + item + ' dropped.');
+            } else {
+                postSystemMessage('[SYSTEM] "' + arg + '" not in inventory');
+            }
+            return '';
+        },
+        helpString: 'Drop item from inventory',
         rawQuotes: true,
     }),
 );
