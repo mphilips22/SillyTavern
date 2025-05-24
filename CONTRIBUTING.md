@@ -21,7 +21,8 @@
 
 1. Our standards are pretty low, but make sure the code is not too ugly:
   - Run VS Code's autoformat when you're done.
-  - Check with ESLint by running `npm run lint`, then fix the errors.
+  - Run `npm install` if you haven't already, then check with ESLint by running `npm run lint` and fix the errors.
+  - Missing `node_modules` will cause ESLint to fail.
   - Use common sense and follow existing naming conventions.
 2. Create pull requests for the staging branch, 99% of contributions should go there. That way people could test your code before the next stable release.
 3. You can still send a pull request for release in the following scenarios:
