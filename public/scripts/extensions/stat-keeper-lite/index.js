@@ -130,6 +130,7 @@ eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => {
 });
 eventSource.on(event_types.APP_READY, highlightAll);
 eventSource.on(event_types.CHAT_CHANGED, highlightAll);
+eventSource.on(event_types.CHAT_CHANGED, () => processedMessages.clear());
 
 SlashCommandParser.addCommandObject(
     SlashCommand.fromProps({
