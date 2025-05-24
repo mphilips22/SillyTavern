@@ -49,18 +49,27 @@ function ensurePlayer() {
             MaxMP: 20,
             inventory: [],
             sceneObjects: [],
+            sceneObjectsFull: [],
         };
         st.player.MaxHP = st.player.HP =
             16 + ((st.player.STR + st.player.DEX) >> 2);
     } else {
         st.player.inventory ??= [];
         st.player.sceneObjects ??= [];
+        st.player.sceneObjectsFull ??= [];
     }
     save();
 }
 
 function clamp(v, m) {
     return Math.max(0, Math.min(m, v));
+}
+
+function canonical(s) {
+    return String(s ?? '')
+        .split(/[(-,]/)[0]
+        .trim()
+        .toLowerCase();
 }
 
 function highlightTags(element) {
@@ -128,13 +137,13 @@ function updateHUD() {
     const sceneUl = /** @type {HTMLUListElement|null} */ (document.querySelector('#skl-scene ul'));
     if (sceneUl) {
         sceneUl.innerHTML = '';
-        p.sceneObjects.forEach((it) => {
+        p.sceneObjectsFull.forEach((it) => {
             const li = document.createElement('li');
             li.textContent = it;
             sceneUl.appendChild(li);
         });
         const summary = document.querySelector('#skl-scene summary');
-        if (summary) summary.textContent = `Scene (${p.sceneObjects.length})`;
+        if (summary) summary.textContent = `Scene (${p.sceneObjectsFull.length})`;
     }
 }
 
@@ -213,7 +222,9 @@ function scanSceneList(text) {
     let start = -1;
     for (let i = 0; i < lines.length; i++) {
         if (/^\s*Scene(?: objects)?:\s*$/i.test(lines[i].trim())) {
-            store().player.sceneObjects = [];
+            const p = store().player;
+            p.sceneObjects = [];
+            p.sceneObjectsFull = [];
             start = i + 1;
             break;
         }
@@ -226,12 +237,42 @@ function scanSceneList(text) {
         if (!line.trim()) break;
         const m = bulletRe.exec(line);
         if (!m) break;
+        if (/\[FIXED\]/i.test(line)) continue;
         let item = m[1].trim().replace(/[.,;!?]+$/g, '').trim();
-        if (item) p.sceneObjects.push(item);
+        if (item) {
+            p.sceneObjects.push(canonical(item));
+            p.sceneObjectsFull.push(item);
+        }
     }
     updateHUD();
     window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
     save();
+}
+
+const takeRe = /\b(?:take|grab|pick\s+up|pocket|stash|add|put)\b[^a-zA-Z]*(.+?)(?:\bto\b|\binto?\b|\bin\b|\binside\b|\bmy\b)[^a-zA-Z]*(?:pack|inventory|bag)?/i;
+
+function autoTakeFromUser(text) {
+    if (!text) return;
+    const m = takeRe.exec(text);
+    if (!m) return;
+    const want = canonical(m[1]);
+    ensurePlayer();
+    const p = store().player;
+    const matches = [];
+    for (let i = 0; i < p.sceneObjects.length; i++) {
+        if (p.sceneObjects[i] === want) matches.push(i);
+    }
+    if (matches.length === 1) {
+        const idx = matches[0];
+        const full = p.sceneObjectsFull[idx];
+        p.sceneObjects.splice(idx, 1);
+        p.sceneObjectsFull.splice(idx, 1);
+        p.inventory.push(full);
+        updateHUD();
+        window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+        save();
+        postSystemMessage('[SYSTEM] ' + full + ' taken.');
+    }
 }
 
 function handleRenderedMessage(id) {
@@ -249,6 +290,8 @@ function handleRenderedMessage(id) {
 
 eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, handleRenderedMessage);
 eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => {
+    const mes = chat[id];
+    if (mes?.is_user) autoTakeFromUser(mes.mes);
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
 });
@@ -259,7 +302,9 @@ eventSource.on(event_types.APP_READY, () => {
 eventSource.on(event_types.CHAT_CHANGED, highlightAll);
 eventSource.on(event_types.CHAT_CHANGED, () => processedMessages.clear());
 eventSource.on(event_types.CHAT_CHANGED, () => {
-    store().player.sceneObjects = [];
+    const p = store().player;
+    p.sceneObjects = [];
+    p.sceneObjectsFull = [];
     updateHUD();
 });
 
@@ -294,7 +339,7 @@ SlashCommandParser.addCommandObject(
         callback: () => {
             ensurePlayer();
             const p = store().player;
-            postSystemMessage(`[SYSTEM] Scene: ${p.sceneObjects.join(', ') || 'none'}`);
+            postSystemMessage(`[SYSTEM] Scene: ${p.sceneObjectsFull.join(', ') || 'none'}`);
             return '';
         },
         helpString: 'List scene objects',
@@ -308,13 +353,21 @@ SlashCommandParser.addCommandObject(
             ensurePlayer();
             const p = store().player;
             const itemName = typeof item === 'string' ? item.trim() : '';
-            const idx = p.sceneObjects.indexOf(itemName);
-            if (idx >= 0) {
+            const want = canonical(itemName);
+            const matches = [];
+            for (let i = 0; i < p.sceneObjects.length; i++) {
+                if (p.sceneObjects[i] === want) matches.push(i);
+            }
+            if (matches.length === 1) {
+                const idx = matches[0];
+                const full = p.sceneObjectsFull[idx];
                 p.sceneObjects.splice(idx, 1);
-                p.inventory.push(itemName);
+                p.sceneObjectsFull.splice(idx, 1);
+                p.inventory.push(full);
                 updateHUD();
                 window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
                 save();
+                postSystemMessage('[SYSTEM] ' + full + ' taken.');
             } else {
                 postSystemMessage(`[SYSTEM] '${itemName}' not found`);
             }
@@ -332,6 +385,7 @@ SlashCommandParser.addCommandObject(
         callback: () => {
             const p = store().player;
             p.sceneObjects.length = 0;
+            p.sceneObjectsFull.length = 0;
             updateHUD();
             window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
             save();
