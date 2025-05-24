@@ -88,16 +88,9 @@ function hideSyncMessages() {
         .forEach((span) => {
             const mes = span.closest('.mes');
             if (!mes) return;
-            const mesText = mes.querySelector('.mes_text');
-            if (!mesText) return;
-            if (
-                mesText.children.length === 1 &&
-                mesText.textContent.trim() === span.textContent.trim()
-            ) {
-                mes.classList.add('skl-hidden-message');
-                if (span.classList.contains('custom-skl-hidden')) {
-                    mes.classList.add('custom-skl-hidden-message');
-                }
+            const text = mes.querySelector('.mes_text');
+            if (text && text.childElementCount === 1 && text.firstElementChild === span) {
+                mes.classList.add('skl-hidden-message', 'custom-skl-hidden-message');
             }
         });
 }
@@ -422,7 +415,7 @@ SlashCommandParser.addCommandObject(
 SlashCommandParser.addCommandObject(
     SlashCommand.fromProps({
         name: 'take',
-        callback: (_, item) => {
+        callback: async (_, item) => {
             ensurePlayer();
             const p = store().player;
             const itemName = typeof item === 'string' ? item.trim() : '';
@@ -437,8 +430,8 @@ SlashCommandParser.addCommandObject(
                 window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
                 save();
                 pushSync(p.sceneObjects, p.inventory);
-                sendMessageAsUser(`I take ${fullText}`, '');
                 postSystemMessage('[SYSTEM] ' + fullText + ' taken.');
+                await sendMessageAsUser('I take ' + fullText, '');
             } else {
                 postSystemMessage(`[SYSTEM] '${itemName}' not found`);
             }
@@ -453,7 +446,7 @@ SlashCommandParser.addCommandObject(
     SlashCommand.fromProps({
         name: 'drop',
         aliases: ['give', 'discard'],
-        callback: (_, arg) => {
+        callback: async (_, arg) => {
             ensurePlayer();
             const p = store().player;
             const want = canonical(typeof arg === 'string' ? arg.trim() : '');
@@ -466,8 +459,8 @@ SlashCommandParser.addCommandObject(
                 updateHUD();
                 save();
                 pushSync(p.sceneObjects, p.inventory);
-                sendMessageAsUser(`I drop ${fullText}`, '');
                 postSystemMessage('[SYSTEM] ' + fullText + ' dropped.');
+                await sendMessageAsUser('I drop ' + fullText, '');
             } else {
                 postSystemMessage(`[SYSTEM] '${arg}' not in inventory`);
             }
