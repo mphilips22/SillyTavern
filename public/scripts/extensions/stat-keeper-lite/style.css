@@ -18,6 +18,14 @@
   display: none !important;
 }
 
+.custom-skl-hidden {
+  display: none !important;
+}
+
 .skl-hidden-message {
+  display: none !important;
+}
+
+.custom-skl-hidden-message {
   display: none !important;
 }

@@ -80,10 +80,14 @@ function highlightTags(element) {
 }
 
 function hideSyncMessages() {
-    document.querySelectorAll('#chat .mes_text .skl-hidden').forEach((span) => {
-        const mes = span.closest('.mes');
-        if (mes) mes.classList.add('skl-hidden-message');
-    });
+    document
+        .querySelectorAll(
+            '#chat .mes_text .skl-hidden, #chat .mes_text .custom-skl-hidden',
+        )
+        .forEach((span) => {
+            const mes = span.closest('.mes');
+            if (mes) mes.classList.add('skl-hidden-message', 'custom-skl-hidden-message');
+        });
 }
 
 function highlightAll() {
