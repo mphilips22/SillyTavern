@@ -66,6 +66,7 @@ function clamp(v, m) {
 function canonical(item) {
     return String(item ?? '')
         .toLowerCase()
+        .replace(/\[[^\]]*\]$/, '')
         .split(/[,(–]/)[0]
         .trim();
 }
@@ -80,10 +81,14 @@ function highlightTags(element) {
 }
 
 function hideSyncMessages() {
-    document.querySelectorAll('#chat .mes_text .skl-hidden').forEach((span) => {
-        const mes = span.closest('.mes');
-        if (mes) mes.classList.add('skl-hidden-message');
-    });
+    document
+        .querySelectorAll(
+            '#chat .mes_text .skl-hidden, #chat .mes_text .custom-skl-hidden',
+        )
+        .forEach((span) => {
+            const mes = span.closest('.mes');
+            if (mes) mes.classList.add('skl-hidden-message', 'custom-skl-hidden-message');
+        });
 }
 
 function highlightAll() {
@@ -254,10 +259,11 @@ function scanSceneList(text) {
     const p = store().player;
     for (let i = start; i < lines.length; i++) {
         const line = lines[i];
-        if (!line.trim()) break;
-        const m = bulletRe.exec(line);
-        if (!m) break;
-        let item = m[1].trim().replace(/[.,;!?]+$/g, '').trim();
+        const trimmed = line.trim();
+        if (!trimmed) break;
+        const m = bulletRe.exec(trimmed);
+        let item = m ? m[1] : trimmed;
+        item = item.trim().replace(/[.,;!?]+$/g, '').trim();
         if (item) p.sceneObjects.push(item);
     }
     updateHUD();
