@@ -15,6 +15,7 @@ import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 
 const SLOT = 'StatKeeperLite';
 const TAG = /\[(HP|MP|MANA)\s*([+-]\d+)(?:\s+([\w\s'-]+))?\]/gi;
+const ACTION_RE = /<span class="skl-hidden">ACTION\|([^<]+)<\/span>/gi;
 const colorFor = (k, n) =>
     k === 'HP'
         ? n < 0
@@ -282,6 +283,38 @@ function scanSceneList(text) {
     pushSync(p.sceneObjects, p.inventory);
 }
 
+function applyActionTag(actionString) {
+    if (!actionString) return;
+    ensurePlayer();
+    const p = store().player;
+    const parts = actionString.trim().split(/\s+/);
+    const cmd = parts.shift()?.toLowerCase();
+    const itemName = parts.join(' ').trim();
+    if (!cmd || !itemName) return;
+    const want = canonical(itemName);
+    if (cmd === 'take') {
+        const matches = p.sceneObjects.filter((o) => canonical(o) === want);
+        if (matches.length === 1) {
+            const item = matches[0];
+            const idx = p.sceneObjects.indexOf(item);
+            if (idx >= 0) p.sceneObjects.splice(idx, 1);
+            p.inventory.push(item);
+        }
+    } else if (cmd === 'drop' || cmd === 'remove' || cmd === 'eat') {
+        const matches = p.inventory.filter((o) => canonical(o) === want);
+        if (matches.length === 1) {
+            const item = matches[0];
+            const idx = p.inventory.indexOf(item);
+            if (idx >= 0) p.inventory.splice(idx, 1);
+            if (cmd !== 'eat') p.sceneObjects.push(item);
+        }
+    }
+    updateHUD();
+    window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+    save();
+    pushSync(p.sceneObjects, p.inventory);
+}
+
 const takeRe = /\b(?:take|grab|pick\s+up|pocket|stash|add)\b[\s-]*(.+?)(?:\bto\b|\binto\b|\bin\b|\bmy\b|\bpack\b|\bbackpack\b|$)/i;
 const dropRe = /\b(?:drop|discard|give|remove|put\s+down)\b[\s-]*(.+?)(?:\bfrom\b|\bto\b|\bmy\b|\binventory\b|\bpack\b|\bbackpack\b|$)/i;
 
@@ -339,6 +372,11 @@ function handleRenderedMessage(id) {
     if (!mes.is_user) {
         applyTagsFromMessage(mes.mes);
         scanSceneList(mes.mes);
+        ACTION_RE.lastIndex = 0;
+        let m;
+        while ((m = ACTION_RE.exec(mes.mes))) {
+            applyActionTag(m[1]);
+        }
         processedMessages.add(id);
     }
 }
