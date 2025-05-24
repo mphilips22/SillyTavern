@@ -220,23 +220,23 @@ function scanSceneList(text) {
     if (start === -1) return;
     const bulletRe = /^\s*[\u2022*-]\s*(.+)$/;
     const p = store().player;
-    let changed = false;
+    p.sceneObjects = [];
     for (let i = start; i < lines.length; i++) {
         const line = lines[i];
         if (!line.trim()) break;
         const m = bulletRe.exec(line);
         if (!m) break;
-        let item = m[1].trim().replace(/[.,;!?]+$/g, '').trim();
-        if (item && !p.sceneObjects.includes(item)) {
-            p.sceneObjects.push(item);
-            changed = true;
+        const parts = m[1].split(/[\u2022*-]/).map((x) => x.trim()).filter(Boolean);
+        for (const part of parts) {
+            const item = part.replace(/[.,;!?]+$/g, '').trim();
+            if (item && !p.sceneObjects.includes(item)) {
+                p.sceneObjects.push(item);
+            }
         }
     }
-    if (changed) {
-        updateHUD();
-        window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
-        save();
-    }
+    updateHUD();
+    window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+    save();
 }
 
 function handleRenderedMessage(id) {
