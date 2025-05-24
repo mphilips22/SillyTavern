@@ -1,3 +1,11 @@
 .sklTag {
   font-weight: 700;
 }
+
+.skl-hidden {
+  display: none !important;
+}
+
+.skl-hidden-message {
+  display: none !important;
+}
