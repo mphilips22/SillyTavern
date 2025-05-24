@@ -79,8 +79,16 @@ function highlightTags(element) {
     });
 }
 
+function hideSyncMessages() {
+    document.querySelectorAll('#chat .mes_text .skl-hidden').forEach((span) => {
+        const mes = span.closest('.mes');
+        if (mes) mes.classList.add('skl-hidden-message');
+    });
+}
+
 function highlightAll() {
     document.querySelectorAll('#chat .mes_text').forEach(highlightTags);
+    hideSyncMessages();
 }
 
 function formatStats() {
@@ -188,6 +196,7 @@ function pushSync(sceneArr, invArr) {
         send_date: Date.now(),
     });
     addOneMessage(chat[mesId]);
+    hideSyncMessages();
 }
 
 function applyTagsFromMessage(text) {
@@ -274,6 +283,7 @@ function autoDropFromUser(text) {
         if (idx >= 0) p.inventory.splice(idx, 1);
         p.sceneObjects.push(item);
         updateHUD();
+        window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
         save();
         pushSync(p.sceneObjects, p.inventory);
         postSystemMessage('[SYSTEM] ' + item + ' dropped.');
@@ -296,6 +306,7 @@ function autoTakeFromUser(text) {
         if (idx >= 0) p.sceneObjects.splice(idx, 1);
         p.inventory.push(item);
         updateHUD();
+        window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
         save();
         pushSync(p.sceneObjects, p.inventory);
         postSystemMessage('[SYSTEM] ' + item + ' taken.');
@@ -307,6 +318,7 @@ function handleRenderedMessage(id) {
     if (!mes) return;
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
+    hideSyncMessages();
     if (processedMessages.has(id)) return;
     if (!mes.is_user) {
         applyTagsFromMessage(mes.mes);
@@ -323,6 +335,7 @@ eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => {
     }
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
+    hideSyncMessages();
 });
 eventSource.on(event_types.APP_READY, () => {
     highlightAll();
@@ -397,10 +410,13 @@ SlashCommandParser.addCommandObject(
             ensurePlayer();
             const p = store().player;
             const itemName = typeof item === 'string' ? item.trim() : '';
-            const idx = p.sceneObjects.indexOf(itemName);
-            if (idx >= 0) {
-                p.sceneObjects.splice(idx, 1);
-                p.inventory.push(itemName);
+            const want = canonical(itemName);
+            const matches = p.sceneObjects.filter((o) => canonical(o) === want);
+            if (matches.length === 1) {
+                const fullText = matches[0];
+                const idx = p.sceneObjects.indexOf(fullText);
+                if (idx >= 0) p.sceneObjects.splice(idx, 1);
+                p.inventory.push(fullText);
                 updateHUD();
                 window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
                 save();
