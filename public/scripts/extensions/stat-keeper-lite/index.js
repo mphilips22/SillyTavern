@@ -283,6 +283,7 @@ function autoDropFromUser(text) {
         if (idx >= 0) p.inventory.splice(idx, 1);
         p.sceneObjects.push(item);
         updateHUD();
+        window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
         save();
         pushSync(p.sceneObjects, p.inventory);
         postSystemMessage('[SYSTEM] ' + item + ' dropped.');
@@ -305,6 +306,7 @@ function autoTakeFromUser(text) {
         if (idx >= 0) p.sceneObjects.splice(idx, 1);
         p.inventory.push(item);
         updateHUD();
+        window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
         save();
         pushSync(p.sceneObjects, p.inventory);
         postSystemMessage('[SYSTEM] ' + item + ' taken.');
@@ -316,6 +318,7 @@ function handleRenderedMessage(id) {
     if (!mes) return;
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
+    hideSyncMessages();
     if (processedMessages.has(id)) return;
     if (!mes.is_user) {
         applyTagsFromMessage(mes.mes);
@@ -332,6 +335,7 @@ eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => {
     }
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
+    hideSyncMessages();
 });
 eventSource.on(event_types.APP_READY, () => {
     highlightAll();

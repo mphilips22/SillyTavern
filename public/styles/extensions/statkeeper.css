@@ -10,3 +10,15 @@
 #skl-hud progress{width:100%;}
 .dmg-flash{animation:dmgflash 0.6s ease;}
 @keyframes dmgflash{0%{background:#a00;}100%{background:inherit;}}
+
+.sklTag {
+  font-weight: 700;
+}
+
+.skl-hidden {
+  display: none !important;
+}
+
+.skl-hidden-message {
+  display: none !important;
+}
