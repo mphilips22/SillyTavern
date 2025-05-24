@@ -206,6 +206,39 @@ function applyTagsFromMessage(text) {
     save();
 }
 
+function scanSceneList(text) {
+    if (!text) return;
+    ensurePlayer();
+    const lines = String(text).split(/\r?\n/);
+    let start = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (/^\s*Scene(?: objects)?:\s*$/i.test(lines[i].trim())) {
+            start = i + 1;
+            break;
+        }
+    }
+    if (start === -1) return;
+    const bulletRe = /^\s*[\u2022*-]\s*(.+)$/;
+    const p = store().player;
+    p.sceneObjects = [];
+    for (let i = start; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line.trim()) break;
+        const m = bulletRe.exec(line);
+        if (!m) break;
+        const parts = m[1].split(/[\u2022*-]/).map((x) => x.trim()).filter(Boolean);
+        for (const part of parts) {
+            const item = part.replace(/[.,;!?]+$/g, '').trim();
+            if (item && !p.sceneObjects.includes(item)) {
+                p.sceneObjects.push(item);
+            }
+        }
+    }
+    updateHUD();
+    window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+    save();
+}
+
 function handleRenderedMessage(id) {
     const mes = chat[id];
     if (!mes) return;
@@ -214,6 +247,7 @@ function handleRenderedMessage(id) {
     if (processedMessages.has(id)) return;
     if (!mes.is_user) {
         applyTagsFromMessage(mes.mes);
+        scanSceneList(mes.mes);
         processedMessages.add(id);
     }
 }
