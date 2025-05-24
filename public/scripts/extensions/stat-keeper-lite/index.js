@@ -79,8 +79,16 @@ function highlightTags(element) {
     });
 }
 
+function hideSyncMessages() {
+    document.querySelectorAll('#chat .mes_text .skl-hidden').forEach((span) => {
+        const mes = span.closest('.mes');
+        if (mes) mes.classList.add('skl-hidden-message');
+    });
+}
+
 function highlightAll() {
     document.querySelectorAll('#chat .mes_text').forEach(highlightTags);
+    hideSyncMessages();
 }
 
 function formatStats() {
@@ -179,7 +187,7 @@ function pushSync(sceneArr, invArr) {
     const mesId = chat.length;
     chat.push({
         name: 'SYSTEM',
-        is_system: true,
+        is_system: false,
         is_user: false,
         mes:
             '<span class="skl-hidden">SYNC|' +
@@ -188,6 +196,7 @@ function pushSync(sceneArr, invArr) {
         send_date: Date.now(),
     });
     addOneMessage(chat[mesId]);
+    hideSyncMessages();
 }
 
 function applyTagsFromMessage(text) {
@@ -397,10 +406,13 @@ SlashCommandParser.addCommandObject(
             ensurePlayer();
             const p = store().player;
             const itemName = typeof item === 'string' ? item.trim() : '';
-            const idx = p.sceneObjects.indexOf(itemName);
-            if (idx >= 0) {
-                p.sceneObjects.splice(idx, 1);
-                p.inventory.push(itemName);
+            const want = canonical(itemName);
+            const matches = p.sceneObjects.filter((o) => canonical(o) === want);
+            if (matches.length === 1) {
+                const fullText = matches[0];
+                const idx = p.sceneObjects.indexOf(fullText);
+                if (idx >= 0) p.sceneObjects.splice(idx, 1);
+                p.inventory.push(fullText);
                 updateHUD();
                 window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
                 save();
