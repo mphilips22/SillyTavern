@@ -63,11 +63,11 @@ function clamp(v, m) {
     return Math.max(0, Math.min(m, v));
 }
 
-function canonical(item) {
-    return String(item ?? '')
-        .toLowerCase()
-        .split(/[,(–]/)[0]
-        .trim();
+function canonical(s) {
+    return String(s ?? '')
+        .split(/[(-,]/)[0]
+        .trim()
+        .toLowerCase();
 }
 
 function highlightTags(element) {
@@ -234,6 +234,7 @@ function scanSceneList(text) {
         const m = bulletRe.exec(line);
         if (!m) break;
         let item = m[1].trim().replace(/[.,;!?]+$/g, '').trim();
+        if (/\[FIXED\]/i.test(item)) continue;
         if (item) p.sceneObjects.push(item);
     }
     updateHUD();
@@ -241,30 +242,8 @@ function scanSceneList(text) {
     save();
 }
 
+const takeRe = /\b(?:take|grab|pick\s+up|pocket|stash|add|put)\b[^a-zA-Z]*(.+?)(?:\bto\b|\binto?\b|\bin\b|\binside\b|\bmy\b)[^a-zA-Z]*(?:pack|inventory|bag)?/i;
 const dropRe = /\b(?:drop|place|put|set|lay|leave|toss)\b[^a-zA-Z]*(.+?)(?:\bdown\b|\bon(?:to)?\b|\bupon\b|\bground\b|\btable\b|\bfloor\b)/i;
-const takeRe = /\b(?:take|grab|pick\s+up|pocket|stash|add)\b[^a-zA-Z]*(.+?)(?:\b(?:in|into|inside|pack|bag|inventory)\b|$)/i;
-
-function autoDropFromUser(text) {
-    if (!text) return false;
-    const m = dropRe.exec(text);
-    if (!m) return false;
-    const want = canonical(m[1]);
-    ensurePlayer();
-    const p = store().player;
-    const cands = p.inventory.filter((o) => canonical(o) === want);
-    if (cands.length === 1) {
-        const item = cands[0];
-        const idx = p.inventory.indexOf(item);
-        if (idx >= 0) p.inventory.splice(idx, 1);
-        p.sceneObjects.push(item);
-        updateHUD();
-        window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
-        save();
-        postSystemMessage('[SYSTEM] ' + item + ' dropped.');
-        return true;
-    }
-    return false;
-}
 
 function autoTakeFromUser(text) {
     if (!text) return false;
@@ -288,6 +267,28 @@ function autoTakeFromUser(text) {
     return false;
 }
 
+function autoDropFromUser(text) {
+    if (!text) return false;
+    const m = dropRe.exec(text);
+    if (!m) return false;
+    const want = canonical(m[1]);
+    ensurePlayer();
+    const p = store().player;
+    const cands = p.inventory.filter((o) => canonical(o) === want);
+    if (cands.length === 1) {
+        const item = cands[0];
+        const idx = p.inventory.indexOf(item);
+        if (idx >= 0) p.inventory.splice(idx, 1);
+        p.sceneObjects.push(item);
+        updateHUD();
+        window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+        save();
+        postSystemMessage('[SYSTEM] ' + item + ' dropped.');
+        return true;
+    }
+    return false;
+}
+
 function handleRenderedMessage(id) {
     const mes = chat[id];
     if (!mes) return;
@@ -304,7 +305,9 @@ function handleRenderedMessage(id) {
 eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, handleRenderedMessage);
 eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => {
     const mes = chat[id];
-    if (mes?.is_user && !autoDropFromUser(mes.mes)) autoTakeFromUser(mes.mes);
+    if (mes?.is_user) {
+        if (!autoDropFromUser(mes.mes)) autoTakeFromUser(mes.mes);
+    }
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
 });
@@ -360,19 +363,22 @@ SlashCommandParser.addCommandObject(
 SlashCommandParser.addCommandObject(
     SlashCommand.fromProps({
         name: 'take',
-        callback: (_, item) => {
+        callback: (_, arg) => {
             ensurePlayer();
             const p = store().player;
-            const itemName = typeof item === 'string' ? item.trim() : '';
-            const idx = p.sceneObjects.indexOf(itemName);
-            if (idx >= 0) {
-                p.sceneObjects.splice(idx, 1);
-                p.inventory.push(itemName);
+            const want = canonical(typeof arg === 'string' ? arg : '');
+            const cands = p.sceneObjects.filter((o) => canonical(o) === want);
+            if (cands.length === 1) {
+                const item = cands[0];
+                const idx = p.sceneObjects.indexOf(item);
+                if (idx >= 0) p.sceneObjects.splice(idx, 1);
+                p.inventory.push(item);
                 updateHUD();
                 window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
                 save();
+                postSystemMessage('[SYSTEM] ' + item + ' taken.');
             } else {
-                postSystemMessage(`[SYSTEM] '${itemName}' not found`);
+                postSystemMessage(`[SYSTEM] "${arg}" not found`);
             }
             return '';
         },
@@ -400,12 +406,29 @@ SlashCommandParser.addCommandObject(
                 save();
                 postSystemMessage('[SYSTEM] ' + item + ' dropped.');
             } else {
-                postSystemMessage('[SYSTEM] "' + arg + '" not in inventory');
+                postSystemMessage(`[SYSTEM] "${arg}" not in inventory`);
             }
             return '';
         },
-        helpString: 'Drop item from inventory',
+        helpString: 'Drop item into scene',
         rawQuotes: true,
+    }),
+);
+
+SlashCommandParser.addCommandObject(
+    SlashCommand.fromProps({
+        name: 'invclear',
+        aliases: ['bagclear'],
+        callback: () => {
+            const p = store().player;
+            p.inventory.length = 0;
+            updateHUD();
+            window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+            save();
+            postSystemMessage('[SYSTEM] Inventory cleared');
+            return '';
+        },
+        helpString: 'Clear inventory list',
     }),
 );
 
