@@ -213,6 +213,7 @@ function scanSceneList(text) {
     let start = -1;
     for (let i = 0; i < lines.length; i++) {
         if (/^\s*Scene(?: objects)?:\s*$/i.test(lines[i].trim())) {
+            store().player.sceneObjects = [];
             start = i + 1;
             break;
         }
@@ -220,19 +221,13 @@ function scanSceneList(text) {
     if (start === -1) return;
     const bulletRe = /^\s*[\u2022*-]\s*(.+)$/;
     const p = store().player;
-    p.sceneObjects = [];
     for (let i = start; i < lines.length; i++) {
         const line = lines[i];
         if (!line.trim()) break;
         const m = bulletRe.exec(line);
         if (!m) break;
-        const parts = m[1].split(/[\u2022*-]/).map((x) => x.trim()).filter(Boolean);
-        for (const part of parts) {
-            const item = part.replace(/[.,;!?]+$/g, '').trim();
-            if (item && !p.sceneObjects.includes(item)) {
-                p.sceneObjects.push(item);
-            }
-        }
+        let item = m[1].trim().replace(/[.,;!?]+$/g, '').trim();
+        if (item) p.sceneObjects.push(item);
     }
     updateHUD();
     window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
@@ -263,6 +258,10 @@ eventSource.on(event_types.APP_READY, () => {
 });
 eventSource.on(event_types.CHAT_CHANGED, highlightAll);
 eventSource.on(event_types.CHAT_CHANGED, () => processedMessages.clear());
+eventSource.on(event_types.CHAT_CHANGED, () => {
+    store().player.sceneObjects = [];
+    updateHUD();
+});
 
 SlashCommandParser.addCommandObject(
     SlashCommand.fromProps({
@@ -323,6 +322,23 @@ SlashCommandParser.addCommandObject(
         },
         helpString: 'Take item from scene',
         rawQuotes: true,
+    }),
+);
+
+SlashCommandParser.addCommandObject(
+    SlashCommand.fromProps({
+        name: 'sceneclear',
+        aliases: ['clrs', 'scenereset'],
+        callback: () => {
+            const p = store().player;
+            p.sceneObjects.length = 0;
+            updateHUD();
+            window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+            save();
+            postSystemMessage('[SYSTEM] Scene list cleared');
+            return '';
+        },
+        helpString: 'Clear scene object list',
     }),
 );
 
