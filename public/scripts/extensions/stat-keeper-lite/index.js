@@ -7,6 +7,7 @@ import {
     characters,
     this_chid,
     getThumbnailUrl,
+    sendMessageAsUser,
 } from '../../../script.js';
 import { extension_settings } from '../../extensions.js';
 import { SlashCommand } from '../../slash-commands/SlashCommand.js';
@@ -80,10 +81,18 @@ function highlightTags(element) {
 }
 
 function hideSyncMessages() {
-    document.querySelectorAll('#chat .mes_text .skl-hidden').forEach((span) => {
-        const mes = span.closest('.mes');
-        if (mes) mes.classList.add('skl-hidden-message');
-    });
+    document
+        .querySelectorAll(
+            '#chat .mes_text .skl-hidden, #chat .mes_text .custom-skl-hidden',
+        )
+        .forEach((span) => {
+            const mes = span.closest('.mes');
+            if (!mes) return;
+            const text = mes.querySelector('.mes_text');
+            if (text && text.childElementCount === 1 && text.firstElementChild === span) {
+                mes.classList.add('skl-hidden-message', 'custom-skl-hidden-message');
+            }
+        });
 }
 
 function highlightAll() {
@@ -406,7 +415,7 @@ SlashCommandParser.addCommandObject(
 SlashCommandParser.addCommandObject(
     SlashCommand.fromProps({
         name: 'take',
-        callback: (_, item) => {
+        callback: async (_, item) => {
             ensurePlayer();
             const p = store().player;
             const itemName = typeof item === 'string' ? item.trim() : '';
@@ -421,6 +430,8 @@ SlashCommandParser.addCommandObject(
                 window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
                 save();
                 pushSync(p.sceneObjects, p.inventory);
+                postSystemMessage('[SYSTEM] ' + fullText + ' taken.');
+                await sendMessageAsUser('I take ' + fullText, '');
             } else {
                 postSystemMessage(`[SYSTEM] '${itemName}' not found`);
             }
@@ -435,7 +446,7 @@ SlashCommandParser.addCommandObject(
     SlashCommand.fromProps({
         name: 'drop',
         aliases: ['give', 'discard'],
-        callback: (_, arg) => {
+        callback: async (_, arg) => {
             ensurePlayer();
             const p = store().player;
             const want = canonical(typeof arg === 'string' ? arg.trim() : '');
@@ -449,6 +460,7 @@ SlashCommandParser.addCommandObject(
                 save();
                 pushSync(p.sceneObjects, p.inventory);
                 postSystemMessage('[SYSTEM] ' + fullText + ' dropped.');
+                await sendMessageAsUser('I drop ' + fullText, '');
             } else {
                 postSystemMessage(`[SYSTEM] '${arg}' not in inventory`);
             }
