@@ -63,6 +63,13 @@ function clamp(v, m) {
     return Math.max(0, Math.min(m, v));
 }
 
+function canonical(item) {
+    return String(item ?? '')
+        .toLowerCase()
+        .split(/[,(–]/)[0]
+        .trim();
+}
+
 function highlightTags(element) {
     if (!element) return;
     if (element.querySelector('.sklTag')) return;
@@ -234,6 +241,28 @@ function scanSceneList(text) {
     save();
 }
 
+const takeRe = /\b(?:take|grab|pick\s+up|pocket|stash|add)\b[\s-]*(.+?)(?:\bto\b|\binto\b|\bin\b|\bmy\b|\bpack\b|\bbackpack\b|$)/i;
+
+function autoTakeFromUser(text) {
+    if (!text) return;
+    const m = takeRe.exec(text);
+    if (!m) return;
+    const want = canonical(m[1]);
+    ensurePlayer();
+    const p = store().player;
+    const cands = p.sceneObjects.filter((o) => canonical(o) === want);
+    if (cands.length === 1) {
+        const item = cands[0];
+        const idx = p.sceneObjects.indexOf(item);
+        if (idx >= 0) p.sceneObjects.splice(idx, 1);
+        p.inventory.push(item);
+        updateHUD();
+        window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+        save();
+        postSystemMessage('[SYSTEM] ' + item + ' taken.');
+    }
+}
+
 function handleRenderedMessage(id) {
     const mes = chat[id];
     if (!mes) return;
@@ -249,6 +278,8 @@ function handleRenderedMessage(id) {
 
 eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, handleRenderedMessage);
 eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => {
+    const mes = chat[id];
+    if (mes?.is_user) autoTakeFromUser(mes.mes);
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
 });
