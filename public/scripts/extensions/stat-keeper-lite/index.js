@@ -56,6 +56,10 @@ function highlightTags(element) {
     });
 }
 
+function highlightAll() {
+    document.querySelectorAll('#chat .mes_text').forEach(highlightTags);
+}
+
 function formatStats() {
     ensurePlayer();
     const p = store().player;
@@ -124,6 +128,8 @@ eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => {
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
 });
+eventSource.on(event_types.APP_READY, highlightAll);
+eventSource.on(event_types.CHAT_CHANGED, highlightAll);
 
 SlashCommandParser.addCommandObject(
     SlashCommand.fromProps({
