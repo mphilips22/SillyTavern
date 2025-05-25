@@ -293,21 +293,24 @@ function applyActionTag(actionString) {
     if (!cmd || !itemName) return;
     const want = canonical(itemName);
     if (cmd === 'take') {
-        const matches = p.sceneObjects.filter((o) => canonical(o) === want);
-        if (matches.length === 1) {
-            const item = matches[0];
-            const idx = p.sceneObjects.indexOf(item);
-            if (idx >= 0) p.sceneObjects.splice(idx, 1);
+        const idx = p.sceneObjects.findIndex((o) => canonical(o) === want);
+        if (idx >= 0) {
+            const item = p.sceneObjects.splice(idx, 1)[0];
             p.inventory.push(item);
         }
-    } else if (cmd === 'drop' || cmd === 'remove' || cmd === 'eat') {
-        const matches = p.inventory.filter((o) => canonical(o) === want);
-        if (matches.length === 1) {
-            const item = matches[0];
-            const idx = p.inventory.indexOf(item);
-            if (idx >= 0) p.inventory.splice(idx, 1);
-            if (cmd !== 'eat') p.sceneObjects.push(item);
+    } else if (cmd === 'drop' || cmd === 'remove') {
+        const idx = p.inventory.findIndex((o) => canonical(o) === want);
+        if (idx >= 0) {
+            const item = p.inventory.splice(idx, 1)[0];
+            p.sceneObjects.push(item);
         }
+    } else if (cmd === 'eat' || cmd === 'use' || cmd === 'consume') {
+        const idx = p.inventory.findIndex((o) => canonical(o) === want);
+        if (idx >= 0) {
+            p.inventory.splice(idx, 1);
+        }
+    } else if (cmd === 'give') {
+        p.inventory.push(itemName);
     }
     updateHUD();
     window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
