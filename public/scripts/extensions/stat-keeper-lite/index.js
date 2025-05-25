@@ -132,11 +132,17 @@ function escapeRegExp(str) {
 
 function highlightItemTerms(element) {
     if (!element) return;
-    if (element.querySelector('.skl-item')) return;
     if (element.querySelector('.skl-hidden')) return;
     ensurePlayer();
     const p = store().player;
     if (!p.sceneObjects?.length) return;
+
+    const current = new Set(
+        [...element.querySelectorAll('.skl-item')].map((s) =>
+            s.textContent?.trim().toLowerCase(),
+        ),
+    );
+
     let html = element.innerHTML;
     for (const it of p.sceneObjects) {
         if (!it) continue;
@@ -144,6 +150,7 @@ function highlightItemTerms(element) {
         const type = tagMatch ? tagMatch[1].toLowerCase() : 'scenery';
         const label = it.replace(/\(.*?\)/, '').trim();
         if (!label) continue;
+        if (current.has(label.toLowerCase())) continue;
         const re = new RegExp(`\\b${escapeRegExp(label)}\\b`, 'gi');
         html = html.replace(re, (m) => `<span class="skl-item skl-${type}">${m}</span>`);
     }
