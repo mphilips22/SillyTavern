@@ -39,3 +39,12 @@
 .custom-skl-hidden-message {
   display: none !important;
 }
+
+/* item highlighting */
+.skl-item{padding:0 2px;border-radius:2px;font-weight:600;}
+.skl-weapon{color:#FFA64C;background:rgba(255,166,76,.15);}
+.skl-consumable{color:#5AFF5A;background:rgba(90,255,90,.10);}
+.skl-container{color:#4FC3F7;background:rgba(79,195,247,.12);}
+.skl-quest{color:#FFD700;background:rgba(255,215,0,.18);font-weight:bold;}
+.skl-npc{color:#C792EA;}
+.skl-scenery{color:#B0BEC5;}
