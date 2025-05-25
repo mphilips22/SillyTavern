@@ -4,10 +4,10 @@ import {
     eventSource,
     event_types,
     saveSettingsDebounced,
-    characters,
-    this_chid,
-    getThumbnailUrl,
     sendMessageAsUser,
+    name1,
+    user_avatar,
+    getUserAvatar,
 } from '../../../script.js';
 import { extension_settings } from '../../extensions.js';
 import { SlashCommand } from '../../slash-commands/SlashCommand.js';
@@ -155,13 +155,12 @@ function updateHUD() {
     const p = store().player;
     const hud = document.getElementById('skl-hud');
     if (!hud) return;
-    const char = characters?.[this_chid];
-    if (char) {
-        const avatarEl = /** @type {HTMLImageElement|null} */ (document.getElementById('skl-avatar'));
-        const nameEl = document.getElementById('skl-name');
-        if (avatarEl) avatarEl.src = getThumbnailUrl('avatar', char.avatar);
-        if (nameEl) nameEl.textContent = char.name;
+    const avatarEl = /** @type {HTMLImageElement|null} */ (document.getElementById('skl-avatar'));
+    const nameEl = document.getElementById('skl-name');
+    if (avatarEl) {
+        avatarEl.src = getUserAvatar(user_avatar);
     }
+    if (nameEl) nameEl.textContent = name1;
     const hp = /** @type {HTMLProgressElement|null} */ (document.getElementById('skl-hp'));
     const mp = /** @type {HTMLProgressElement|null} */ (document.getElementById('skl-mp'));
     if (hp) {
