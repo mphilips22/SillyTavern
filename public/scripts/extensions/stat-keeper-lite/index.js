@@ -116,6 +116,29 @@ function highlightTags(element) {
     });
 }
 
+function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function highlightItemTerms(element) {
+    if (!element) return;
+    if (element.querySelector('.skl-item')) return;
+    ensurePlayer();
+    const p = store().player;
+    if (!p.sceneObjects?.length) return;
+    let html = element.innerHTML;
+    for (const it of p.sceneObjects) {
+        if (!it) continue;
+        const tagMatch = /(weapon|consumable|container|quest|npc)/i.exec(it);
+        const type = tagMatch ? tagMatch[1].toLowerCase() : 'scenery';
+        const label = it.replace(/\(.*?\)/, '').trim();
+        if (!label) continue;
+        const re = new RegExp(`\\b${escapeRegExp(label)}\\b`, 'gi');
+        html = html.replace(re, (m) => `<span class="skl-item skl-${type}">${m}</span>`);
+    }
+    element.innerHTML = html;
+}
+
 function hideSyncMessages() {
     document
         .querySelectorAll(
@@ -139,7 +162,10 @@ function hideSyncMessages() {
 }
 
 function highlightAll() {
-    document.querySelectorAll('#chat .mes_text').forEach(highlightTags);
+    document.querySelectorAll('#chat .mes_text').forEach((el) => {
+        highlightTags(el);
+        highlightItemTerms(el);
+    });
     hideSyncMessages();
 }
 
@@ -454,6 +480,7 @@ function handleRenderedMessage(id) {
             applyActionTag(m[1]);
         }
         processedMessages.add(id);
+        highlightItemTerms(el);
     }
 }
 
@@ -465,6 +492,7 @@ eventSource.on(event_types.USER_MESSAGE_RENDERED, (id) => {
     }
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
+    highlightItemTerms(el);
     hideSyncMessages();
 });
 eventSource.on(event_types.APP_READY, () => {
