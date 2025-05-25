@@ -16,6 +16,7 @@ import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 const SLOT = 'StatKeeperLite';
 const TAG = /\[(HP|MP|MANA)\s*([+-]\d+)(?:\s+([\w\s'-]+))?\]/gi;
 const ACTION_RE = /<span class="skl-hidden">ACTION\|([^<]+)<\/span>/gi;
+const SYNC_RE = /<span class="skl-hidden">SYNC\|([^<]+)<\/span>/i;
 const colorFor = (k, n) =>
     k === 'HP'
         ? n < 0
@@ -473,6 +474,22 @@ function handleRenderedMessage(id) {
     hideSyncMessages();
     if (processedMessages.has(id)) return;
     if (!mes.is_user) {
+        SYNC_RE.lastIndex = 0;
+        const syncMatch = SYNC_RE.exec(mes.mes);
+        if (syncMatch) {
+            try {
+                const data = JSON.parse(syncMatch[1]);
+                ensurePlayer();
+                const p = store().player;
+                if (Array.isArray(data.scene)) p.sceneObjects = [...data.scene];
+                if (Array.isArray(data.inv)) p.inventory = [...data.inv];
+                updateHUD();
+                window.dispatchEvent(new CustomEvent('statkeeper:update', { detail: p }));
+                save();
+            } catch (err) {
+                console.error('[StatKeeperLite] Failed to parse SYNC data', err);
+            }
+        }
         applyTagsFromMessage(mes.mes);
         scanSceneList(mes.mes);
         ACTION_RE.lastIndex = 0;
