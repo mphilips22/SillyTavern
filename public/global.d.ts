@@ -9,6 +9,8 @@ declare global {
     // Global namespace modules
     interface Window {
         ai: any;
+        StatKeeperDice: (expr?: string) =>
+        { total: number; rolls: number[]; expr: string } | null;
     }
 
     declare var pdfjsLib;
