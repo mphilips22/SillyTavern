@@ -73,6 +73,14 @@ function canonical(item) {
         .trim();
 }
 
+function findMatchingItem(list, want) {
+    let matches = list.filter((o) => canonical(o) === want);
+    if (matches.length !== 1) {
+        matches = list.filter((o) => canonical(o).includes(want));
+    }
+    return matches;
+}
+
 /**
  * Roll dice using an expression like `2d6+1`.
  * @param {string} [expr="1d6"] expression to evaluate
@@ -395,21 +403,26 @@ function applyActionTag(actionString) {
     if (!cmd || !itemName) return;
     const want = canonical(itemName);
     if (cmd === 'take') {
-        const idx = p.sceneObjects.findIndex((o) => canonical(o) === want);
-        if (idx >= 0) {
-            const item = p.sceneObjects.splice(idx, 1)[0];
+        const matches = findMatchingItem(p.sceneObjects, want);
+        if (matches.length === 1) {
+            const item = matches[0];
+            const idx = p.sceneObjects.indexOf(item);
+            if (idx >= 0) p.sceneObjects.splice(idx, 1);
             p.inventory.push(item);
         }
     } else if (cmd === 'drop' || cmd === 'remove') {
-        const idx = p.inventory.findIndex((o) => canonical(o) === want);
-        if (idx >= 0) {
-            const item = p.inventory.splice(idx, 1)[0];
+        const matches = findMatchingItem(p.inventory, want);
+        if (matches.length === 1) {
+            const item = matches[0];
+            const idx = p.inventory.indexOf(item);
+            if (idx >= 0) p.inventory.splice(idx, 1);
             p.sceneObjects.push(item);
         }
     } else if (cmd === 'eat' || cmd === 'use' || cmd === 'consume') {
-        const idx = p.inventory.findIndex((o) => canonical(o) === want);
-        if (idx >= 0) {
-            p.inventory.splice(idx, 1);
+        const matches = findMatchingItem(p.inventory, want);
+        if (matches.length === 1) {
+            const idx = p.inventory.indexOf(matches[0]);
+            if (idx >= 0) p.inventory.splice(idx, 1);
         }
     } else if (cmd === 'give') {
         p.inventory.push(itemName);
@@ -430,7 +443,7 @@ function autoDropFromUser(text) {
     const want = canonical(m[1]);
     ensurePlayer();
     const p = store().player;
-    const cands = p.inventory.filter((o) => canonical(o) === want);
+    const cands = findMatchingItem(p.inventory, want);
     if (cands.length === 1) {
         const item = cands[0];
         const idx = p.inventory.indexOf(item);
@@ -453,7 +466,7 @@ function autoTakeFromUser(text) {
     const want = canonical(m[1]);
     ensurePlayer();
     const p = store().player;
-    const cands = p.sceneObjects.filter((o) => canonical(o) === want);
+    const cands = findMatchingItem(p.sceneObjects, want);
     if (cands.length === 1) {
         const item = cands[0];
         const idx = p.sceneObjects.indexOf(item);
@@ -589,7 +602,7 @@ SlashCommandParser.addCommandObject(
             const p = store().player;
             const itemName = typeof item === 'string' ? item.trim() : '';
             const want = canonical(itemName);
-            const matches = p.sceneObjects.filter((o) => canonical(o) === want);
+            const matches = findMatchingItem(p.sceneObjects, want);
             if (matches.length === 1) {
                 const fullText = matches[0];
                 const idx = p.sceneObjects.indexOf(fullText);
@@ -619,7 +632,7 @@ SlashCommandParser.addCommandObject(
             ensurePlayer();
             const p = store().player;
             const want = canonical(typeof arg === 'string' ? arg.trim() : '');
-            const matches = p.inventory.filter((o) => canonical(o) === want);
+            const matches = findMatchingItem(p.inventory, want);
             if (matches.length === 1) {
                 const fullText = matches[0];
                 const idx = p.inventory.indexOf(fullText);
