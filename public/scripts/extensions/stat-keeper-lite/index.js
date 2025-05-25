@@ -206,7 +206,7 @@ function updateHUD() {
 }
 
 function injectHUD() {
-    if (document.getElementById('skl-hud')) return;
+    document.querySelectorAll('#skl-hud').forEach(el => el.remove());
     if (!document.getElementById('skl-style')) {
         const link = document.createElement('link');
         link.id = 'skl-style';
@@ -218,9 +218,48 @@ function injectHUD() {
     div.id = 'skl-hud';
     div.innerHTML =
         '<img id="skl-avatar"><div id="skl-name"></div><progress id="skl-hp" max="100" value="100"></progress><progress id="skl-mp" max="100" value="100"></progress><span id="skl-stats"></span><span id="skl-equipped"></span><details id="skl-inv"><summary>Inventory (0)</summary><ul></ul></details><details id="skl-scene"><summary>Scene (0)</summary><ul></ul></details>';
-    (document.querySelector('#sidebar') ?? document.body).prepend(div);
+    document.body.prepend(div);
+    makeHudDraggable(div);
     updateHUD();
     console.log('[StatKeeper-HUD] ready');
+}
+
+function makeHudDraggable(div) {
+    if (!div) return;
+    const st = store();
+    st.settings ??= {};
+    const pos = st.settings.hudPos;
+    div.style.position = 'absolute';
+    div.style.zIndex = '1000';
+    if (pos && typeof pos.left === 'number' && typeof pos.top === 'number') {
+        div.style.left = pos.left + 'px';
+        div.style.top = pos.top + 'px';
+    }
+
+    let offsetX = 0;
+    let offsetY = 0;
+    const onMove = (e) => {
+        div.style.left = e.clientX - offsetX + 'px';
+        div.style.top = e.clientY - offsetY + 'px';
+    };
+    const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        st.settings.hudPos = {
+            left: parseInt(div.style.left, 10) || 0,
+            top: parseInt(div.style.top, 10) || 0,
+        };
+        save();
+    };
+    div.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        const rect = div.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+        e.preventDefault();
+    });
 }
 
 function postSystemMessage(html) {
