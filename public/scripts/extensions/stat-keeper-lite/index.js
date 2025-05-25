@@ -72,6 +72,41 @@ function canonical(item) {
         .trim();
 }
 
+/**
+ * Roll dice using an expression like `2d6+1`.
+ * @param {string} [expr="1d6"] expression to evaluate
+ * @returns {{total:number, rolls:number[], expr:string}|null}
+ */
+function rollDice(expr = '1d6') {
+    if (typeof expr !== 'string') expr = String(expr);
+    const clean = expr.replace(/\s+/g, '').toLowerCase();
+    const m = /^(\d*)d(\d+)([+-]\d+)?$/.exec(clean);
+    if (!m) return null;
+    const count = parseInt(m[1] || '1', 10);
+    const sides = parseInt(m[2], 10);
+    const mod = m[3] ? parseInt(m[3], 10) : 0;
+
+    /** @type {(max:number)=>number} */
+    let rnd = (max) => Math.floor(Math.random() * max);
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const buf = new Uint32Array(1);
+        rnd = (max) => {
+            crypto.getRandomValues(buf);
+            return Math.floor((buf[0] / 2 ** 32) * max);
+        };
+    }
+
+    const rolls = [];
+    for (let i = 0; i < count; i++) {
+        rolls.push(rnd(sides) + 1);
+    }
+    const total = rolls.reduce((a, b) => a + b, 0) + mod;
+    const norm = `${count}d${sides}` + (mod ? (mod > 0 ? `+${mod}` : mod) : '');
+    return { total, rolls, expr: norm };
+}
+
+window.StatKeeperDice = rollDice;
+
 function highlightTags(element) {
     if (!element) return;
     if (element.querySelector('.sklTag')) return;
@@ -534,6 +569,26 @@ SlashCommandParser.addCommandObject(
             return '';
         },
         helpString: 'Clear scene object list',
+    }),
+);
+
+SlashCommandParser.addCommandObject(
+    SlashCommand.fromProps({
+        name: 'roll',
+        callback: (_, expr) => {
+            const strExpr = typeof expr === 'string' ? expr : String(expr ?? '');
+            const res = rollDice(strExpr || '1d6');
+            if (!res) {
+                postSystemMessage('[SYSTEM] Invalid dice expression');
+            } else {
+                postSystemMessage(
+                    `[SYSTEM] Rolled ${res.expr} → ${res.total} (${res.rolls.join(', ')})`,
+                );
+            }
+            return '';
+        },
+        helpString: 'Roll dice, e.g. /roll 2d6+1',
+        rawQuotes: true,
     }),
 );
 
