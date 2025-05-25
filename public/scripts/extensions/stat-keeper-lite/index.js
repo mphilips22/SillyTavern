@@ -469,6 +469,7 @@ function handleRenderedMessage(id) {
     if (!mes) return;
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     highlightTags(el);
+    highlightItemTerms(el);
     hideSyncMessages();
     if (processedMessages.has(id)) return;
     if (!mes.is_user) {
