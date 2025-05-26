@@ -1,6 +1,6 @@
-const ctx = SillyTavern?.getContext?.() ?? {};
-export const playerName = ctx.character?.name || ctx.persona?.name || "Player";
-const chatId = ctx.chat?.id || "default";
+const ctx = /** @type {any} */ (globalThis.SillyTavern?.getContext?.()) ?? {};
+export const playerName = ctx.character?.name || ctx.persona?.name || 'Player';
+const chatId = ctx.chat?.id || 'default';
 const STORAGE_KEY = `st.rpg.coreState.v1::${chatId}`;
 
 function blankChar() {
@@ -37,17 +37,17 @@ export function modHP(target, delta, reason) {
     const c = state.characters[name];
     c.hp = Math.max(0, Math.min(c.max_hp, c.hp + delta));
     saveDebounced();
-    window.dispatchEvent(new CustomEvent("hpChange", {
+    window.dispatchEvent(new CustomEvent('hpChange', {
         detail: { target: name, delta, current: c.hp, max: c.max_hp, reason: reason ?? null },
         bubbles: true,
-        composed: true
+        composed: true,
     }));
 }
 
 export function clearState() {
     state = { characters: {}, clock: { minute: 0 }, meta: { chatId, ver: 1 } };
     saveDebounced();
-    window.dispatchEvent(new CustomEvent("stateReset", { bubbles: true, composed: true }));
+    window.dispatchEvent(new CustomEvent('stateReset', { bubbles: true, composed: true }));
 }
 
 export function snapshot() {
@@ -59,15 +59,15 @@ export function addItem() { /* TODO */ }
 export function removeItem() { /* TODO */ }
 export function advanceTime() { /* TODO */ }
 
-window.getState = getState;
-window.modHP = modHP;
-window.clearState = clearState;
-window.snapshot = snapshot;
-window.modMP = modMP;
-window.addItem = addItem;
-window.removeItem = removeItem;
-window.advanceTime = advanceTime;
-window.playerName = playerName;
+window['getState'] = getState;
+window['modHP'] = modHP;
+window['clearState'] = clearState;
+window['snapshot'] = snapshot;
+window['modMP'] = modMP;
+window['addItem'] = addItem;
+window['removeItem'] = removeItem;
+window['advanceTime'] = advanceTime;
+window['playerName'] = playerName;
 
 /* ===============================================================
    Dev smoke test – paste into browser console after reload
