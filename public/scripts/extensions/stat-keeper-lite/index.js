@@ -132,10 +132,15 @@ function escapeRegExp(str) {
 
 function highlightItemTerms(element) {
     if (!element) return;
-    if (element.querySelector('.skl-hidden')) return;
     ensurePlayer();
     const p = store().player;
     if (!p.sceneObjects?.length) return;
+
+    const hidden = [];
+    element.querySelectorAll('.skl-hidden').forEach((span, idx) => {
+        hidden[idx] = span.outerHTML;
+        span.replaceWith(`__SKL_HIDDEN_${idx}__`);
+    });
 
     const current = new Set(
         [...element.querySelectorAll('.skl-item')].map((s) =>
@@ -154,9 +159,13 @@ function highlightItemTerms(element) {
         const re = new RegExp(`\\b${escapeRegExp(label)}\\b`, 'gi');
         html = html.replace(re, (m) => `<span class="skl-item skl-${type}">${m}</span>`);
     }
+
+    for (let i = 0; i < hidden.length; i++) {
+        html = html.replace(`__SKL_HIDDEN_${i}__`, hidden[i]);
+    }
+
     element.innerHTML = html;
 }
-
 function hideSyncMessages() {
     document
         .querySelectorAll(
