@@ -132,11 +132,22 @@ function escapeRegExp(str) {
 
 function highlightItemTerms(element) {
     if (!element) return;
-    if (element.querySelector('.skl-item')) return;
-    if (element.querySelector('.skl-hidden')) return;
     ensurePlayer();
     const p = store().player;
     if (!p.sceneObjects?.length) return;
+
+    const hidden = [];
+    element.querySelectorAll('.skl-hidden').forEach((span, idx) => {
+        hidden[idx] = span.outerHTML;
+        span.replaceWith(`__SKL_HIDDEN_${idx}__`);
+    });
+
+    const current = new Set(
+        [...element.querySelectorAll('.skl-item')].map((s) =>
+            s.textContent?.trim().toLowerCase(),
+        ),
+    );
+
     let html = element.innerHTML;
     for (const it of p.sceneObjects) {
         if (!it) continue;
@@ -144,12 +155,17 @@ function highlightItemTerms(element) {
         const type = tagMatch ? tagMatch[1].toLowerCase() : 'scenery';
         const label = it.replace(/\(.*?\)/, '').trim();
         if (!label) continue;
+        if (current.has(label.toLowerCase())) continue;
         const re = new RegExp(`\\b${escapeRegExp(label)}\\b`, 'gi');
         html = html.replace(re, (m) => `<span class="skl-item skl-${type}">${m}</span>`);
     }
+
+    for (let i = 0; i < hidden.length; i++) {
+        html = html.replace(`__SKL_HIDDEN_${i}__`, hidden[i]);
+    }
+
     element.innerHTML = html;
 }
-
 function hideSyncMessages() {
     document
         .querySelectorAll(
