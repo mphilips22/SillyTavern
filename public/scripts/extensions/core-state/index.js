@@ -1,3 +1,5 @@
+import { debounce } from '../../utils.js';
+
 const ctx = /** @type {any} */ (globalThis.SillyTavern?.getContext?.()) ?? {};
 export const playerName = ctx.character?.name || ctx.persona?.name || 'Player';
 const chatId = ctx.chat?.id || 'default';
@@ -9,7 +11,14 @@ function blankChar() {
 
 let state = (() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : { characters: {}, clock: { minute: 0 }, meta: { chatId, ver: 1 } };
+    if (saved) {
+        try {
+            return JSON.parse(saved);
+        } catch (err) {
+            console.error('Failed to parse core state:', err);
+        }
+    }
+    return { characters: {}, clock: { minute: 0 }, meta: { chatId, ver: 1 } };
 })();
 
 state.characters = state.characters || {};
@@ -17,9 +26,15 @@ state.clock = state.clock || { minute: 0 };
 state.meta = state.meta || { chatId, ver: 1 };
 if (!state.characters[playerName]) state.characters[playerName] = blankChar();
 
-let saveTimeout = null;
-function persist() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-function saveDebounced() { clearTimeout(saveTimeout); saveTimeout = setTimeout(persist, 250); }
+function persist() {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (err) {
+        console.error('Failed to save core state:', err);
+    }
+}
+
+const saveDebounced = debounce(persist, 250);
 
 function ensureChar(target) {
     const name = target || playerName;
