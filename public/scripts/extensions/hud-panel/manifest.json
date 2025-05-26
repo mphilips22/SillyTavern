@@ -1,6 +1,11 @@
 {
-  "id": "hud-panel",
-  "name": "HUD Panel",
-  "entry": "index.js",
-  "type": "extension"
+  "display_name": "Hud Panel",
+  "loading_order": 6,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "",
+  "author": "SillyTavern User",
+  "version": "1.0.0",
+  "homePage": "https://github.com/SillyTavern/SillyTavern"
 }
