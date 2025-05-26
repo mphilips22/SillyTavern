@@ -1,12 +1,18 @@
 import { debounce } from '../../utils.js';
 
+let defaultMaxHp = 100;
+
+export function setDefaultMaxHp(value) {
+    defaultMaxHp = value;
+}
+
 const ctx = /** @type {any} */ (globalThis.SillyTavern?.getContext?.()) ?? {};
 export const playerName = ctx.character?.name || ctx.persona?.name || 'Player';
 const chatId = ctx.chat?.id || 'default';
 const STORAGE_KEY = `st.rpg.coreState.v1::${chatId}`;
 
 function blankChar() {
-    return { hp: 0, max_hp: 100, mp: 0, max_mp: 100, inventory: [], buffs: {} };
+    return { hp: defaultMaxHp, max_hp: defaultMaxHp, mp: 0, max_mp: 100, inventory: [], buffs: {} };
 }
 
 let state = (() => {
@@ -83,16 +89,18 @@ window['addItem'] = addItem;
 window['removeItem'] = removeItem;
 window['advanceTime'] = advanceTime;
 window['playerName'] = playerName;
+window['setDefaultMaxHp'] = setDefaultMaxHp;
 
 /* ===============================================================
    Dev smoke test – paste into browser console after reload
 ================================================================ */
 /* ===== Core-State smoke test =====
 clearState();                     // reset
+setDefaultMaxHp(150);             // customise initial HP
 modHP(undefined, 50);             // heal +50 (defaults to player)
 modHP(undefined, -7, "club");     // dmg -7
 const s = getState(playerName);
-console.assert(s.hp === 43, "HP calc failed");
+console.assert(s.hp === 143, "HP calc failed");
 
 let fired = false;
 window.addEventListener("hpChange", e=>{
