@@ -144,7 +144,7 @@ function highlightItemTerms(element) {
 
     const current = new Set(
         [...element.querySelectorAll('.skl-item')].map((s) =>
-            s.textContent?.trim().toLowerCase(),
+            canonical(s.textContent),
         ),
     );
 
@@ -153,9 +153,9 @@ function highlightItemTerms(element) {
         if (!it) continue;
         const tagMatch = /(weapon|consumable|container|quest|npc)/i.exec(it);
         const type = tagMatch ? tagMatch[1].toLowerCase() : 'scenery';
-        const label = it.replace(/\(.*?\)/, '').trim();
+        const label = canonical(it);
         if (!label) continue;
-        if (current.has(label.toLowerCase())) continue;
+        if (current.has(label)) continue;
         const re = new RegExp(`\\b${escapeRegExp(label)}\\b`, 'gi');
         html = html.replace(re, (m) => `<span class="skl-item skl-${type}">${m}</span>`);
     }
