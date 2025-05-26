@@ -1,0 +1,6 @@
+{
+  "id": "hud-panel",
+  "name": "HUD Panel",
+  "entry": "index.js",
+  "type": "extension"
+}
