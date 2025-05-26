@@ -75,9 +75,45 @@ export function snapshot() {
     return JSON.parse(JSON.stringify(state));
 }
 
-export function modMP() { /* TODO */ }
-export function addItem() { /* TODO */ }
-export function removeItem() { /* TODO */ }
+export function modMP(target, delta, reason) {
+    const name = ensureChar(target);
+    const c = state.characters[name];
+    c.mp = Math.max(0, Math.min(c.max_mp, c.mp + delta));
+    saveDebounced();
+    window.dispatchEvent(new CustomEvent('mpChange', {
+        detail: { target: name, delta, current: c.mp, max: c.max_mp, reason: reason ?? null },
+        bubbles: true,
+        composed: true,
+    }));
+}
+
+export function addItem(target, item) {
+    const name = ensureChar(target);
+    const c = state.characters[name];
+    c.inventory.push(item);
+    saveDebounced();
+    window.dispatchEvent(new CustomEvent('itemAdd', {
+        detail: { target: name, item },
+        bubbles: true,
+        composed: true,
+    }));
+}
+
+export function removeItem(target, item) {
+    const name = ensureChar(target);
+    const c = state.characters[name];
+    const idx = c.inventory.indexOf(item);
+    if (idx !== -1) {
+        c.inventory.splice(idx, 1);
+        saveDebounced();
+        window.dispatchEvent(new CustomEvent('itemRemove', {
+            detail: { target: name, item },
+            bubbles: true,
+            composed: true,
+        }));
+    }
+}
+
 export function advanceTime() { /* TODO */ }
 
 window['getState'] = getState;
@@ -90,6 +126,16 @@ window['removeItem'] = removeItem;
 window['advanceTime'] = advanceTime;
 window['playerName'] = playerName;
 window['setDefaultMaxHp'] = setDefaultMaxHp;
+window['CoreState'] = {
+    getState,
+    modHP,
+    modMP,
+    addItem,
+    removeItem,
+    clearState,
+    snapshot,
+    setDefaultMaxHp,
+};
 
 /* ===============================================================
    Dev smoke test – paste into browser console after reload
