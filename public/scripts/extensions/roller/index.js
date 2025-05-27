@@ -6,7 +6,7 @@ import * as CoreState from '../core-state/index.js';
 const TxStore = {};
 
 function ensureSettings() {
-    const ctx = globalThis.SillyTavern?.getContext?.() ?? {};
+    const ctx = /** @type {any} */ (globalThis.SillyTavern?.getContext?.()) ?? {};
     ctx.extensionSettings ??= {};
     ctx.extensionSettings.features ??= {};
     const feat = ctx.extensionSettings.features;
@@ -81,7 +81,7 @@ function invert(patch) {
 export function autoRoll(expr, patch = null) {
     const settings = ensureSettings();
     if (!settings.enabled) return null;
-    const ctx = globalThis.SillyTavern?.getContext?.() ?? {};
+    const ctx = /** @type {any} */ (globalThis.SillyTavern?.getContext?.()) ?? {};
     const res = parse(expr);
     if (typeof res === 'string') return null;
     const message = {
@@ -121,7 +121,7 @@ export function undoTx(id) {
     const settings = ensureSettings();
     if (!settings.enabled) return;
     eventSource?.on?.(event_types.MESSAGE_SENT, (id) => {
-        const ctx = globalThis.SillyTavern?.getContext?.() ?? {};
+        const ctx = /** @type {any} */ (globalThis.SillyTavern?.getContext?.()) ?? {};
         const msg = ctx.chat?.[id];
         if (!msg?.is_user) return;
         const text = String(msg.mes || '').trim();
@@ -130,7 +130,7 @@ export function undoTx(id) {
             autoRoll(expr);
         }
     });
-    window.eventSource?.on?.('messageDeleted', (id) => undoTx(id));
+    eventSource?.on?.(event_types.MESSAGE_DELETED, (id) => undoTx(id));
 })();
 
 window['Roller'] = { parse, autoRoll, undoTx };
