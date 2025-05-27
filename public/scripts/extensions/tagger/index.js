@@ -1,7 +1,5 @@
 import * as CoreState from '../core-state/index.js';
-
-// Access the global event source provided by the build
-const { eventSource, event_types } = window;
+import { eventSource, event_types } from '../../../script.js';
 
 // Resolve the player name from the current context at load time
 /** @type {any} */
