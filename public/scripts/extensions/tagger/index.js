@@ -4,6 +4,7 @@ import * as CoreState from '../core-state/index.js';
 const { eventSource, event_types } = window;
 
 // Resolve the player name from the current context at load time
+/** @type {any} */
 const ctx = SillyTavern?.getContext?.() ?? {};
 const PLAYER = ctx.character?.name || ctx.persona?.name || 'Player';
 
@@ -28,11 +29,14 @@ function typeFor(id) {
 
 function rebuildFromState() {
     if (!window.CoreState) return;
-    const state = CoreState.getState(PLAYER) || {};
+    const root   = CoreState.getState();
+    const player = root.characters?.[PLAYER] || {};
+
     invSet.clear();
-    (state.inventory || []).forEach(it => invSet.add(it));
+    (player.inventory || []).forEach(i => invSet.add(i));
+
     sceneSet.clear();
-    (state.sceneObjects || []).forEach(it => sceneSet.add(it));
+    (root.sceneObjects || []).forEach(i => sceneSet.add(i));
 }
 
 function recolor(id) {
@@ -104,7 +108,7 @@ function highlight(element) {
             const p = node.parentElement;
             if (p && p.closest('code, pre, .rpg-item')) return NodeFilter.FILTER_REJECT;
             return NodeFilter.FILTER_ACCEPT;
-        }
+        },
     });
     const nodes = [];
     for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
