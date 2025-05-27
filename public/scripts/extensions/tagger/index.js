@@ -1,5 +1,11 @@
 import * as CoreState from '../core-state/index.js';
-import { eventSource, event_types } from '../../script.js';
+
+// Access the global event source provided by the build
+const { eventSource, event_types } = window;
+
+// Resolve the player name from the current context at load time
+const ctx = SillyTavern?.getContext?.() ?? {};
+const PLAYER = ctx.character?.name || ctx.persona?.name || 'Player';
 
 console.log('[Tagger] extension loaded');
 
@@ -22,7 +28,7 @@ function typeFor(id) {
 
 function rebuildFromState() {
     if (!window.CoreState) return;
-    const state = CoreState.getState(CoreState.playerName) || {};
+    const state = CoreState.getState(PLAYER) || {};
     invSet.clear();
     (state.inventory || []).forEach(it => invSet.add(it));
     sceneSet.clear();
@@ -83,7 +89,10 @@ function getItems() {
     return arr.sort((a,b) => b.label.length - a.label.length);
 }
 
-const escapeRE = str => str.replace(/[.*+?^${}()|[\]\]/g, '\\$&');
+// Escape characters that have special meaning in regular expressions
+// Adapted from the standard escape implementation recommended by MDN
+const escapeRE = (str) =>
+    str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function highlight(element) {
     if (!element) return;
