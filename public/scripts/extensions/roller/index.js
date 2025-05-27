@@ -4,7 +4,7 @@ import { SlashCommand } from '../../slash-commands/SlashCommand.js';
 import { ARGUMENT_TYPE, SlashCommandArgument } from '../../slash-commands/SlashCommandArgument.js';
 import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 // Core state utilities in /public/scripts/extensions/core-state
-import * as CoreState from '../core-state/index.js';
+import * as CoreState from '../../core-state/index.js';
 
 const TxStore = {};
 
@@ -60,7 +60,10 @@ export function parse(expr) {
 function applyPatch(patch) {
     if (!patch || !patch.verb) return;
     const fn = CoreState[patch.verb];
-    if (typeof fn !== 'function') return;
+    if (typeof fn !== 'function') {
+        console.warn('[Roller] unknown verb', patch.verb);
+        return;
+    }
     const args = [];
     if (patch.target !== undefined) args.push(patch.target);
     if (patch.delta !== undefined) args.push(patch.delta);
@@ -156,9 +159,10 @@ export function undoTx(id) {
 window['Roller'] = { parse, autoRoll, undoTx };
 
 /* ===== Roller smoke test =====
-const test = Roller.parse("4d6kh3+2");
-console.log("[parse]", test);
-const msgId = Roller.autoRoll("1d4+1", {verb:'modHP',target:'Player',delta:-3});
-console.assert(typeof msgId === 'number', "autoRoll did not return msgId");
-Roller.undoTx(msgId);  // should heal +3 HP
+CoreState.clearState();
+CoreState.modHP(undefined, 40);
+const id = Roller.autoRoll('1d4+1', { verb: 'modHP', delta: -5 });
+Roller.undoTx(id);
+const cur = CoreState.getState(CoreState.playerName).hp;
+console.assert(cur === 40, 'HP after undo should be 40');
 */
