@@ -4,7 +4,7 @@ import { SlashCommand } from '../../slash-commands/SlashCommand.js';
 import { ARGUMENT_TYPE, SlashCommandArgument } from '../../slash-commands/SlashCommandArgument.js';
 import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 // Core state utilities in /public/scripts/extensions/core-state
-import * as CoreState from '../../core-state/index.js';
+import * as CoreState from '../core-state/index.js';
 
 const TxStore = {};
 
