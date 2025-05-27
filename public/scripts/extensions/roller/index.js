@@ -64,11 +64,7 @@ function applyPatch(patch) {
         console.warn('[Roller] unknown verb', patch.verb);
         return;
     }
-    const args = [];
-    if (patch.target !== undefined) args.push(patch.target);
-    if (patch.delta !== undefined) args.push(patch.delta);
-    if (patch.item !== undefined) args.push(patch.item);
-    fn(...args);
+    fn(patch.target, patch.delta, patch.item);
 }
 
 function invert(patch) {
