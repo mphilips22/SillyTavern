@@ -29,21 +29,42 @@ function rebuildFromState() {
     (state.sceneObjects || []).forEach(it => sceneSet.add(it));
 }
 
+function recolor(id) {
+    const locClass = invSet.has(id) ? 'inv' : 'scene';
+    const typeClass = `type-${typeFor(id)}`;
+    document.querySelectorAll(`.rpg-item[data-item-id="${id}"]`).forEach(sp => {
+        sp.classList.toggle('inv', locClass === 'inv');
+        sp.classList.toggle('scene', locClass === 'scene');
+        sp.classList.forEach(c => { if (c.startsWith('type-')) sp.classList.remove(c); });
+        sp.classList.add(typeClass);
+    });
+}
+
 function handleSceneUpdate(e) {
     if (!e?.detail?.items) return;
     sceneSet.clear();
-    e.detail.items.forEach(it => sceneSet.add(it));
+    e.detail.items.forEach(it => {
+        sceneSet.add(it);
+        recolor(it);
+    });
+    highlightAll();
 }
 
 function handleItemAdd(e) {
     if (e?.detail?.item) {
         invSet.add(e.detail.item);
         sceneSet.delete(e.detail.item);
+        recolor(e.detail.item);
+        highlightAll();
     }
 }
 
 function handleItemRemove(e) {
-    if (e?.detail?.item) invSet.delete(e.detail.item);
+    if (e?.detail?.item) {
+        invSet.delete(e.detail.item);
+        recolor(e.detail.item);
+        highlightAll();
+    }
 }
 
 function handleStateReset() {
@@ -62,7 +83,7 @@ function getItems() {
     return arr.sort((a,b) => b.label.length - a.label.length);
 }
 
-const escapeRE = str => str.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+const escapeRE = str => str.replace(/[.*+?^${}()|[\]\]/g, '\\$&');
 
 function highlight(element) {
     if (!element) return;
@@ -82,7 +103,7 @@ function highlight(element) {
         let html = node.nodeValue;
         items.forEach(it => {
             const re = new RegExp(`\\b${escapeRE(it.label)}\\b`, 'gi');
-            html = html.replace(re, `<span class="rpg-item ${it.location} type-${it.type}">$&</span>`);
+            html = html.replace(re, `<span class="rpg-item ${it.location} type-${it.type}" data-item-id="${it.id}">$&</span>`);
         });
         if (html !== node.nodeValue) {
             const tmp = document.createElement('span');
@@ -106,7 +127,7 @@ function injectCss() {
         const link = document.createElement('link');
         link.id = 'tagger-style';
         link.rel = 'stylesheet';
-        link.href = 'extensions/tagger/tagger.css';
+        link.href = 'scripts/extensions/tagger/tagger.css';
         document.head.appendChild(link);
     }
 }
@@ -133,15 +154,9 @@ if (document.readyState !== 'loading') {
     document.addEventListener('DOMContentLoaded', init, { once: true });
 }
 
-/* ===============================================================
-   Dev smoke test – paste into browser console after reload
-================================================================ */
-/* ===== Tagger smoke test =====
+/* Dev test (paste in console):
 CoreState.clearState();
-window.dispatchEvent(new CustomEvent('sceneUpdate', {detail:{items:['RustyShortsword','BreadLoaf']}}));
-const p=document.createElement('p');
-p.textContent='You spot a Rusty Shortsword beside a stale bread loaf.';
-document.body.appendChild(p);
-Tagger.highlight(p);
-// Expect shortsword tagged as scene+weapon and bread loaf as scene+consumable
+CoreState.setSceneObjects(["RustyShortsword","BreadLoaf"]);
+addGM("You see a Rusty Shortsword and a bread loaf.");
+CoreState.addItem(undefined,"RustyShortsword"); // sword span should turn green
 */
