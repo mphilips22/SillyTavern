@@ -1,5 +1,7 @@
-import { eventSource, event_types, addOneMessage } from '../../../../script.js';
-import * as CoreState from '../../core-state/index.js';
+// Imported from /public/script.js
+import { eventSource, event_types } from '../../../script.js';
+// Core state utilities in /public/scripts/extensions/core-state
+import * as CoreState from '../core-state/index.js';
 
 const TxStore = {};
 
