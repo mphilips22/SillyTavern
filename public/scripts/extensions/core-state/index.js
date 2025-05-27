@@ -1,5 +1,7 @@
 import { debounce } from '../../utils.js';
 
+/** @typedef {string[]} SceneArray */
+
 let defaultMaxHp = 100;
 
 export function setDefaultMaxHp(value) {
@@ -78,7 +80,7 @@ export function snapshot() {
 
 /**
  * Replace the current scene objects.
- * @param {string[]} items
+ * @param {SceneArray} items
  */
 export function setScene(items = []) {
     state.sceneObjects = [...items];
@@ -87,7 +89,6 @@ export function setScene(items = []) {
 }
 
 export { setScene as setSceneObjects };
-const setSceneObjects = setScene;
 
 export function modMP(target, delta, reason) {
     const name = ensureChar(target);
@@ -109,7 +110,7 @@ export function addItem(target, itemId) {
         c.inventory.push(itemId);
         saveDebounced();
         window.dispatchEvent(new CustomEvent('itemAdd', {
-            detail: { target: name, item: itemId },
+            detail: { item: itemId },
             bubbles: true,
             composed: true,
         }));
@@ -125,7 +126,7 @@ export function removeItem(target, itemId) {
         c.inventory.splice(idx, 1);
         saveDebounced();
         window.dispatchEvent(new CustomEvent('itemRemove', {
-            detail: { target: name, item: itemId },
+            detail: { item: itemId },
             bubbles: true,
             composed: true,
         }));
@@ -151,7 +152,7 @@ window['CoreState'] = {
     modHP,
     modMP,
     setScene,
-    setSceneObjects,
+    setSceneObjects: setScene,
     addItem,
     removeItem,
     clearState,
