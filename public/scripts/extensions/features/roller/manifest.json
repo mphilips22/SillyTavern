@@ -1,6 +1,0 @@
-{
-  "id": "roller",
-  "name": "Automatic Dice Roller",
-  "entry": "index.js",
-  "type": "extension"
-}
