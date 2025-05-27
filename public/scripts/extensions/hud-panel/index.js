@@ -70,6 +70,25 @@ function createPanel() {
     return div;
 }
 
+function renderSceneObjects(arr = []) {
+    const sceneUl = document.querySelector('.hud-panel .hud-scene ul');
+    const sceneSum = document.querySelector('.hud-panel .hud-scene summary');
+    if (!sceneUl || !sceneSum) return;
+    sceneUl.innerHTML = '';
+    if (!Array.isArray(arr) || arr.length === 0) {
+        sceneUl.style.display = 'none';
+        sceneSum.textContent = 'Scene Objects (0)';
+        return;
+    }
+    sceneUl.style.display = '';
+    arr.forEach(it => {
+        const li = document.createElement('li');
+        li.textContent = it;
+        sceneUl.appendChild(li);
+    });
+    sceneSum.textContent = `Scene Objects (${arr.length})`;
+}
+
 function updatePanel(div) {
     const state = CoreState.getState(CoreState.playerName) || {};
     div.querySelector('.hud-avatar').src = getUserAvatar(user_avatar);
@@ -99,17 +118,7 @@ function updatePanel(div) {
         });
         invSum.textContent = `Inventory (${(state.inventory || []).length})`;
     }
-    const sceneUl = div.querySelector('.hud-scene ul');
-    const sceneSum = div.querySelector('.hud-scene summary');
-    if (sceneUl && sceneSum) {
-        sceneUl.innerHTML = '';
-        (state.sceneObjects || []).forEach(it => {
-            const li = document.createElement('li');
-            li.textContent = it;
-            sceneUl.appendChild(li);
-        });
-        sceneSum.textContent = `Scene Objects (${(state.sceneObjects || []).length})`;
-    }
+    renderSceneObjects(state.sceneObjects || []);
 }
 
 export function init() {
@@ -118,11 +127,15 @@ export function init() {
     injectCss();
     const panel = createPanel();
     updatePanel(panel);
+    renderSceneObjects(CoreState.getState().sceneObjects);
     window.addEventListener('hpChange', () => updatePanel(panel));
     window.addEventListener('mpChange', () => updatePanel(panel));
     window.addEventListener('itemAdd', () => updatePanel(panel));
     window.addEventListener('itemRemove', () => updatePanel(panel));
     window.addEventListener('stateReset', () => updatePanel(panel));
+    window.addEventListener('sceneUpdate', e => {
+        renderSceneObjects(e.detail.items);
+    });
     globalThis.HUDPanel = { element: panel, update: () => updatePanel(panel) };
 }
 
@@ -135,6 +148,10 @@ if (document.readyState !== 'loading') {
 /* ===============================================================
    Dev smoke test – paste into browser console after reload
 ================================================================ */
-/* ===== HUD Panel smoke test =====
-globalThis.HUDPanel?.update?.();
+/*
+clearState();
+setScene(['Torch','Key']);
+→ HUD shows 2 scene objects.
+setScene(['Ruby']);
+→ HUD updates to 1 scene object.
 */
