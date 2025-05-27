@@ -1,6 +1,8 @@
 import * as CoreState from '../core-state/index.js';
 import { name1, user_avatar, getUserAvatar } from '../../../script.js';
 
+console.log('[HUD-panel] script loaded');
+/** @type {any} */
 const ctx = globalThis.SillyTavern?.getContext?.() ?? {};
 const chatId = ctx.chatId || ctx.chat?.id || 'default';
 const STORAGE_KEY = `hudPanelPos::${chatId}`;
@@ -121,7 +123,7 @@ export function init() {
     window.addEventListener('itemAdd', () => updatePanel(panel));
     window.addEventListener('itemRemove', () => updatePanel(panel));
     window.addEventListener('stateReset', () => updatePanel(panel));
-    window.HUDPanel = { element: panel, update: () => updatePanel(panel) };
+    globalThis.HUDPanel = { element: panel, update: () => updatePanel(panel) };
 }
 
 if (document.readyState !== 'loading') {
@@ -134,5 +136,5 @@ if (document.readyState !== 'loading') {
    Dev smoke test – paste into browser console after reload
 ================================================================ */
 /* ===== HUD Panel smoke test =====
-HUDPanel.update();
+globalThis.HUDPanel?.update?.();
 */
