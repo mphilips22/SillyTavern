@@ -24,11 +24,12 @@ let state = (() => {
             console.error('Failed to parse core state:', err);
         }
     }
-    return { characters: {}, clock: { minute: 0 }, meta: { chatId, ver: 1 } };
+    return { characters: {}, clock: { minute: 0 }, sceneObjects: [], meta: { chatId, ver: 1 } };
 })();
 
 state.characters = state.characters || {};
 state.clock = state.clock || { minute: 0 };
+state.sceneObjects = state.sceneObjects || [];
 state.meta = state.meta || { chatId, ver: 1 };
 if (!state.characters[playerName]) state.characters[playerName] = blankChar();
 
@@ -66,7 +67,7 @@ export function modHP(target, delta, reason) {
 }
 
 export function clearState() {
-    state = { characters: {}, clock: { minute: 0 }, meta: { chatId, ver: 1 } };
+    state = { characters: {}, clock: { minute: 0 }, sceneObjects: [], meta: { chatId, ver: 1 } };
     saveDebounced();
     window.dispatchEvent(new CustomEvent('stateReset', { bubbles: true, composed: true }));
 }
@@ -74,6 +75,19 @@ export function clearState() {
 export function snapshot() {
     return JSON.parse(JSON.stringify(state));
 }
+
+/**
+ * Replace the current scene objects.
+ * @param {string[]} items
+ */
+export function setScene(items = []) {
+    state.sceneObjects = [...items];
+    saveDebounced();
+    window.dispatchEvent(new CustomEvent('sceneUpdate', { detail: { items: [...state.sceneObjects] } }));
+}
+
+export { setScene as setSceneObjects };
+const setSceneObjects = setScene;
 
 export function modMP(target, delta, reason) {
     const name = ensureChar(target);
@@ -87,27 +101,31 @@ export function modMP(target, delta, reason) {
     }));
 }
 
-export function addItem(target, item) {
+/** @param {string=} target @param {string} itemId */
+export function addItem(target, itemId) {
     const name = ensureChar(target);
     const c = state.characters[name];
-    c.inventory.push(item);
-    saveDebounced();
-    window.dispatchEvent(new CustomEvent('itemAdd', {
-        detail: { target: name, item },
-        bubbles: true,
-        composed: true,
-    }));
+    if (!c.inventory.includes(itemId)) {
+        c.inventory.push(itemId);
+        saveDebounced();
+        window.dispatchEvent(new CustomEvent('itemAdd', {
+            detail: { target: name, item: itemId },
+            bubbles: true,
+            composed: true,
+        }));
+    }
 }
 
-export function removeItem(target, item) {
+/** @param {string=} target @param {string} itemId */
+export function removeItem(target, itemId) {
     const name = ensureChar(target);
     const c = state.characters[name];
-    const idx = c.inventory.indexOf(item);
+    const idx = c.inventory.indexOf(itemId);
     if (idx !== -1) {
         c.inventory.splice(idx, 1);
         saveDebounced();
         window.dispatchEvent(new CustomEvent('itemRemove', {
-            detail: { target: name, item },
+            detail: { target: name, item: itemId },
             bubbles: true,
             composed: true,
         }));
@@ -125,11 +143,15 @@ window['addItem'] = addItem;
 window['removeItem'] = removeItem;
 window['advanceTime'] = advanceTime;
 window['playerName'] = playerName;
+window['setScene'] = setScene;
+window['setSceneObjects'] = setScene;
 window['setDefaultMaxHp'] = setDefaultMaxHp;
 window['CoreState'] = {
     getState,
     modHP,
     modMP,
+    setScene,
+    setSceneObjects,
     addItem,
     removeItem,
     clearState,
@@ -140,18 +162,16 @@ window['CoreState'] = {
 /* ===============================================================
    Dev smoke test – paste into browser console after reload
 ================================================================ */
-/* ===== Core-State smoke test =====
-clearState();                     // reset
-setDefaultMaxHp(150);             // customise initial HP
-modHP(undefined, 50);             // heal +50 (defaults to player)
-modHP(undefined, -7, "club");     // dmg -7
-const s = getState(playerName);
-console.assert(s.hp === 143, "HP calc failed");
+/* === v1.1 smoke test ===
+clearState();
+setScene(['Sword','Shield']);
+console.assert(getState().sceneObjects.length === 2, 'scene set');
 
-let fired = false;
-window.addEventListener("hpChange", e=>{
-  if(e.detail.delta === -7) fired = true;
-});
-modHP(playerName, -7);
-console.assert(fired, "hpChange event not fired");
+addItem(undefined, 'Sword');
+console.assert(getState().characters[playerName].inventory.includes('Sword'),
+               'inventory add');
+
+removeItem(undefined, 'Sword');
+console.assert(!getState().characters[playerName].inventory.includes('Sword'),
+               'inventory remove');
 */
