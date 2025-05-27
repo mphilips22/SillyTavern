@@ -1,0 +1,6 @@
+.rpg-item.scene { color:#B0BEC5; }
+.rpg-item.inv { color:#5AFF5A; }
+.type-weapon { color:#FFA64C; }
+.type-consumable { color:#7CF96A; }
+.type-quest { color:#FFD700; font-weight:bold; }
+.type-misc { color:#CCCCCC; }
