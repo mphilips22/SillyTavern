@@ -10,6 +10,7 @@ declare global {
     interface Window {
         ai: any;
         StatKeeperDice: (expr?: string) => { total: number; rolls: number[]; expr: string } | null;
+        HUDPanel?: { element: HTMLElement; update: () => void };
     }
 
     declare var pdfjsLib;
