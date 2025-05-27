@@ -1,5 +1,8 @@
 // Imported from /public/script.js
 import { eventSource, event_types } from '../../../script.js';
+import { SlashCommand } from '../../slash-commands/SlashCommand.js';
+import { ARGUMENT_TYPE, SlashCommandArgument } from '../../slash-commands/SlashCommandArgument.js';
+import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 // Core state utilities in /public/scripts/extensions/core-state
 import * as CoreState from '../core-state/index.js';
 
@@ -130,6 +133,23 @@ export function undoTx(id) {
             autoRoll(expr);
         }
     });
+    SlashCommandParser.addCommandObject(
+        SlashCommand.fromProps({
+            name: 'roll',
+            helpString: 'Roll dice using NdS notation. Example: /roll 2d6+1',
+            unnamedArgumentList: [
+                SlashCommandArgument.fromProps({
+                    description: 'dice expression',
+                    typeList: [ARGUMENT_TYPE.STRING],
+                }),
+            ],
+            callback: async (_, expr) => {
+                const expression = String(expr || '1d6');
+                autoRoll(expression);
+                return '';
+            },
+        }),
+    );
     eventSource?.on?.(event_types.MESSAGE_DELETED, (id) => undoTx(id));
 })();
 
