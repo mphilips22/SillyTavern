@@ -1,0 +1,11 @@
+{
+  "display_name": "Roller",
+  "loading_order": 7,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "",
+  "author": "SillyTavern User",
+  "version": "1.0.0",
+  "homePage": "https://github.com/SillyTavern/SillyTavern"
+}
