@@ -146,16 +146,8 @@ function addSceneItem(item){
 
 function dropItem(target, item){
     const id = canon(item);
-    if(!removeInventoryItem(target, id)){
-        if(STRICT){
-            commentBubble(`Unknown item: ${item}`);
-            return;
-        }
-        CoreState.addItem(target, id);
-        removeInventoryItem(target, id);
-    }
+    CoreState.removeItem(target, id);
     addSceneItem(id);
-    window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: id } }));
 }
 
 
