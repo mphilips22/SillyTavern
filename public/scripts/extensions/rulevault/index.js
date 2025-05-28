@@ -29,6 +29,14 @@ function coreSetScene(items){
     window.dispatchEvent(new CustomEvent('sceneUpdate', { detail:{ items } }));
 }
 
+function removeSceneItem(item){
+    const state = CoreState.getState();
+    const items = (state.sceneObjects || []).filter(it => it !== item);
+    if(items.length !== (state.sceneObjects || []).length){
+        coreSetScene(items);
+    }
+}
+
 function handleCommand(cmd){
     if(!cmd) return;
     if(cmd.verb === 'setScene'){
@@ -36,35 +44,48 @@ function handleCommand(cmd){
         coreSetScene(items);
     }else if(cmd.verb === 'addItem'){
         if(cmd.args.item){
-            CoreState.addItem(personaName(), cmd.args.item);
+            const target = cmd.args.target || personaName();
+            CoreState.addItem(target, cmd.args.item);
+            if(target === personaName()) removeSceneItem(cmd.args.item);
             window.dispatchEvent(new CustomEvent('itemAdd', { detail:{ item: cmd.args.item } }));
         }
     }else if(cmd.verb === 'removeItem'){
         if(cmd.args.item){
-            CoreState.removeItem(personaName(), cmd.args.item);
+            const target = cmd.args.target || personaName();
+            if(target.toLowerCase() === 'scene'){
+                removeSceneItem(cmd.args.item);
+            }else{
+                CoreState.removeItem(target, cmd.args.item);
+            }
             window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: cmd.args.item } }));
         }
     }
 }
 
-function parseControl(line) {
-    if (!line.startsWith('::')) return null;
-    const m = /^::(\w+)\s*(.*)$/.exec(line.trim());
-    if (!m) return null;
-    const verb = m[1];
-    const argStr = m[2];
-    const args = {};
-    const re = /(\w+)=((?:"[^"]*"|'[^']*'|\[[^\]]*\]|\S+))/g;
-    let match;
-    while ((match = re.exec(argStr)) !== null) {
-        let val = match[2];
-        if ((val.startsWith('"') && val.endsWith('"')) ||
-            (val.startsWith('\'') && val.endsWith('\''))) {
-            val = val.slice(1, -1);
+function parseCommands(line) {
+    if (!line.startsWith('::')) return [];
+    const raw = line.slice(2).trim();
+    const parts = raw.split(';').map(p => p.trim()).filter(Boolean);
+    const cmds = [];
+    for (const part of parts) {
+        const m = /^(\w+)\s*(.*)$/.exec(part);
+        if (!m) continue;
+        const verb = m[1];
+        const argStr = m[2];
+        const args = {};
+        const re = /(\w+)=((?:"[^"]*"|'[^']*'|\[[^\]]*\]|\S+))/g;
+        let match;
+        while ((match = re.exec(argStr)) !== null) {
+            let val = match[2];
+            if ((val.startsWith('"') && val.endsWith('"')) ||
+                (val.startsWith('\'') && val.endsWith('\''))) {
+                val = val.slice(1, -1);
+            }
+            args[match[1]] = val;
         }
-        args[match[1]] = val;
+        cmds.push({ verb, args });
     }
-    return { verb, args };
+    return cmds;
 }
 
 function onMessage(id){
@@ -74,12 +95,12 @@ function onMessage(id){
     if(!lines.length) return;
     const last = lines[lines.length - 1].trim();
     if(!last.startsWith('::')) return;
-    const cmd = parseControl(last);
+    const cmds = parseCommands(last);
     lines.pop();
     const newText = lines.join('\n');
     mes.mes = newText;
     if ('mes_html' in mes) mes.mes_html = newText;
-    handleCommand(cmd);
+    cmds.forEach(cmd => handleCommand(cmd));
 }
 
 function init(){
