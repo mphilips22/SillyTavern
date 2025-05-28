@@ -358,15 +358,10 @@ function processPacket(cmds){
             }
         }
     }
-    for(const p of pending){
-        let ok = scene.has(p.id);
-        if(!ok){
-            for (const set of Object.values(inv)) if (set.has(p.id)) { ok = true; break; }
-        }
-        if(!ok){
-            unknownItem(p.raw);
-            return;
-        }
+    if (STRICT && pending.length){
+        actions.length = 0;
+        assistantBubble(`*Unknown item: ${pending[0].raw}*`);
+        return;
     }
     actions.forEach(fn=>fn());
 }
@@ -469,7 +464,7 @@ async function runSmokeTest(){
         state = CoreState.getState();
         d = delta(before);
         const last = chat[chat.length - 1];
-        const bubble = chat.length === preLen + 1 && last?.extra?.type === system_message_types.COMMENT;
+        const bubble = chat.length === preLen + 1 && last?.extra?.type === system_message_types.ASSISTANT_MESSAGE;
         console.assert(!state.characters[personaName()].inventory.includes('fakegem') && bubble, 'strict block');
         console.assert(d.sceneUpdate === 0 && d.itemAdd === 0 && d.itemRemove === 0, 'event count');
         if(state.characters[personaName()].inventory.includes('fakegem') || !bubble || d.sceneUpdate !== 0 || d.itemAdd !== 0 || d.itemRemove !== 0) throw new Error('strict mode block');
