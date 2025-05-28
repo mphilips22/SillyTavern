@@ -9,6 +9,19 @@ import {
 import { commonEnumProviders } from '../../slash-commands/SlashCommandCommonEnumsProvider.js';
 import { debounce } from '../../utils.js';
 
+const STRICT = window.RuleVault?.strict === true || window.RuleVaultStrict === true;
+
+function canon(id){
+    return String(id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function unknownItem(id){
+    console.warn('[RuleVault] unknown item', id);
+    if(STRICT && window.toastr) {
+        toastr.error(`Unknown item: ${id}`, 'RuleVault');
+    }
+}
+
 function personaName(){
     return SillyTavern?.getContext?.().character?.name
       || SillyTavern?.getContext?.().persona?.name
@@ -28,6 +41,23 @@ function stripHtml(html){
     return div.textContent || '';
 }
 
+function findInventoryItem(target, id){
+    const c = canon(id);
+    const name = target || personaName();
+    const state = CoreState.getState();
+    const inv = state.characters?.[name]?.inventory || [];
+    return inv.find(it => canon(it) === c);
+}
+
+function removeInventoryItem(target, id){
+    const actual = findInventoryItem(target, id);
+    if(actual){
+        CoreState.removeItem(target, actual);
+        return true;
+    }
+    return false;
+}
+
 const ctx = SillyTavern?.getContext?.() ?? {};
 const chatId = ctx.chat?.id || 'default';
 const STORAGE_KEY = `st.rpg.coreState.v1::${chatId}`;
@@ -40,37 +70,45 @@ const saveSceneDebounced = debounce(() => {
 }, 250);
 
 function coreSetScene(items){
+    const canonItems = [...new Set(items.map(canon))];
     if(typeof CoreState.setScene === 'function'){
-        CoreState.setScene(items);
+        CoreState.setScene(canonItems);
     }else if(typeof CoreState.updateSceneObjects === 'function'){
-        CoreState.updateSceneObjects(items);
+        CoreState.updateSceneObjects(canonItems);
     }else{
         const state = CoreState.getState();
-        state.sceneObjects = items;
+        state.sceneObjects = canonItems;
         saveSceneDebounced();
     }
-    window.dispatchEvent(new CustomEvent('sceneUpdate', { detail:{ items } }));
+    window.dispatchEvent(new CustomEvent('sceneUpdate', { detail:{ items: canonItems } }));
 }
 
 function removeSceneItem(item){
+    const c = canon(item);
     const state = CoreState.getState();
-    const items = (state.sceneObjects || []).filter(it => it !== item);
+    const items = (state.sceneObjects || []).filter(it => canon(it) !== c);
     if(items.length !== (state.sceneObjects || []).length){
         coreSetScene(items);
+        return true;
     }
+    return false;
 }
 
 function addSceneItem(item){
     const state = CoreState.getState();
-    const items = new Set(state.sceneObjects || []);
-    items.add(item);
+    const items = new Set((state.sceneObjects || []).map(canon));
+    items.add(canon(item));
     coreSetScene([...items]);
 }
 
 function dropItem(target, item){
-    CoreState.removeItem(target, item);
-    addSceneItem(item);
-    window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item } }));
+    const id = canon(item);
+    if(!removeInventoryItem(target, id)){
+        unknownItem(item);
+        return;
+    }
+    addSceneItem(id);
+    window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: id } }));
 }
 
 function clearSceneSlash(){
@@ -96,16 +134,23 @@ function handleCommand(cmd){
     }else if(cmd.verb === 'addItem'){
         if(cmd.args.item){
             const target = cmd.args.target || personaName();
-            CoreState.addItem(target, cmd.args.item);
-            removeSceneItem(cmd.args.item);
-            window.dispatchEvent(new CustomEvent('itemAdd', { detail:{ item: cmd.args.item } }));
+            const id = canon(cmd.args.item);
+            if(!removeSceneItem(id)){
+                unknownItem(cmd.args.item);
+                return;
+            }
+            CoreState.addItem(target, id);
+            window.dispatchEvent(new CustomEvent('itemAdd', { detail:{ item: id } }));
         }
     }else if(cmd.verb === 'removeItem'){
         if(cmd.args.item){
             const target = cmd.args.target || personaName();
             if(target.toLowerCase() === 'scene'){
-                removeSceneItem(cmd.args.item);
-                window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: cmd.args.item } }));
+                if(removeSceneItem(cmd.args.item)){
+                    window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: canon(cmd.args.item) } }));
+                } else {
+                    unknownItem(cmd.args.item);
+                }
             }else{
                 dropItem(target, cmd.args.item);
             }
@@ -113,8 +158,21 @@ function handleCommand(cmd){
     }else if(cmd.verb === 'consumeItem'){
         if(cmd.args.item){
             const target = cmd.args.target || personaName();
-            CoreState.removeItem(target, cmd.args.item);
-            window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: cmd.args.item } }));
+            const id = canon(cmd.args.item);
+            let removed = false;
+            if(target.toLowerCase() === 'scene'){
+                removed = removeSceneItem(id);
+            } else {
+                removed = removeInventoryItem(target, id);
+                if(!removed){
+                    removed = removeSceneItem(id);
+                }
+            }
+            if(removed){
+                window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: id } }));
+            } else {
+                unknownItem(cmd.args.item);
+            }
         }
     }else if(cmd.verb === 'modHP'){
         const target = cmd.args.target || personaName();
