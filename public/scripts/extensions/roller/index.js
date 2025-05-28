@@ -92,6 +92,7 @@ export function autoRoll(expr, patch = null) {
         is_system: false,
         mes: res.text,
         send_date: Date.now(),
+        meta: { roller: true },
     };
     ctx.chat?.push(message);
     const mid = ctx.chat ? ctx.chat.length - 1 : 0;
@@ -122,16 +123,18 @@ export function undoTx(id) {
 (function init() {
     const settings = ensureSettings();
     if (!settings.enabled) return;
-    eventSource?.on?.(event_types.MESSAGE_SENT, (id) => {
+    const checkAndRoll = (id) => {
         const ctx = /** @type {any} */ (globalThis.SillyTavern?.getContext?.()) ?? {};
         const msg = ctx.chat?.[id];
-        if (!msg?.is_user) return;
+        if (!msg || msg.meta?.roller) return;
         const text = String(msg.mes || '').trim();
-        if (text.toLowerCase().startsWith('/roll')) {
+        if (text.startsWith('/roll') && /d\d/i.test(text)) {
             const expr = text.slice(5).trim() || '1d6';
             autoRoll(expr);
         }
-    });
+    };
+    eventSource?.on?.(event_types.MESSAGE_SENT, checkAndRoll);
+    eventSource?.on?.(event_types.MESSAGE_RECEIVED, checkAndRoll);
     SlashCommandParser.addCommandObject(
         SlashCommand.fromProps({
             name: 'roll',
