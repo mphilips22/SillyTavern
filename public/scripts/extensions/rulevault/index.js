@@ -93,8 +93,14 @@ function onMessage(id){
     if(!mes || mes.is_user) return;
     const lines = String(mes.mes || '').split(/\r?\n/);
     if(!lines.length) return;
-    const last = lines[lines.length - 1].trim();
-    if(!last.startsWith('::')) return;
+    let idx = lines.length - 1;
+    let last = lines[idx].trim();
+    while(idx > 0 && last === ''){
+        lines.pop();
+        idx = lines.length - 1;
+        last = lines[idx]?.trim();
+    }
+    if(!last || !last.startsWith('::')) return;
     const cmds = parseCommands(last);
     lines.pop();
     const newText = lines.join('\n');
