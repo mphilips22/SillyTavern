@@ -379,6 +379,9 @@
             "voicMapText": "",
             "voiceMap": {}
         },
+        "ruleVault": {
+            "strict": true
+        },
         "cfg": {
             "global": {
                 "guidance_scale": 1,

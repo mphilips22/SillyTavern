@@ -201,6 +201,9 @@ export const extension_settings = {
     rvc: {},
     hypebot: {},
     vectors: {},
+    ruleVault: {
+        strict: true,
+    },
     variables: {
         global: {},
     },

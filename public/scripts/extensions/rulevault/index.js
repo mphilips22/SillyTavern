@@ -8,8 +8,9 @@ import {
 } from '../../slash-commands/SlashCommandArgument.js';
 import { commonEnumProviders } from '../../slash-commands/SlashCommandCommonEnumsProvider.js';
 import { debounce } from '../../utils.js';
+import { extension_settings } from '../../extensions.js';
 
-const STRICT = window.RuleVault?.strict === true || window.RuleVaultStrict === true;
+let STRICT = true;
 
 function canon(id){
     return String(id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -94,8 +95,10 @@ const saveSceneDebounced = debounce(() => {
 function coreSetScene(items){
     const canonItems = [...new Set(items.map(canon))];
     if(typeof CoreState.setScene === 'function'){
-        CoreState.setScene(canonItems);
-    }else if(typeof CoreState.updateSceneObjects === 'function'){
+        CoreState.setScene(canonItems); // event dispatched inside
+        return;
+    }
+    if(typeof CoreState.updateSceneObjects === 'function'){
         CoreState.updateSceneObjects(canonItems);
     }else{
         const state = CoreState.getState();
@@ -386,6 +389,7 @@ function onMessage(id){
 }
 
 function init(){
+    STRICT = extension_settings?.ruleVault?.strict !== false;
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessage);
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
