@@ -161,6 +161,7 @@ function parseCommands(line) {
                 (val.startsWith('\'') && val.endsWith('\''))) {
                 val = val.slice(1, -1);
             }
+            val = val.replace(/<[^>]*>/g, '');
             args[match[1]] = val;
         }
         cmds.push({ verb, args });
@@ -179,12 +180,21 @@ function onMessage(id){
     for(const line of lines){
         const idx = line.indexOf('::');
         if(idx !== -1){
-            const tail = line.slice(idx).trim();
+            let tail = line.slice(idx);
+            let remainder = '';
+            const closeIdx = tail.search(/<\/\w+>/);
+            if(closeIdx !== -1){
+                remainder = tail.slice(closeIdx).replace(/<[^>]*>/g, '');
+                tail = tail.slice(0, closeIdx).trim();
+            }else{
+                tail = tail.trim();
+            }
             const cmds = parseCommands(tail);
             if(cmds.length){
                 cmds.forEach(handleCommand);
-                const head = line.slice(0, idx).trimEnd();
-                if(head) newLines.push(head);
+                const head = line.slice(0, idx);
+                const finalText = (head + remainder).trim();
+                if(finalText) newLines.push(finalText);
                 found = true;
                 continue;
             }
