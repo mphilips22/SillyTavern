@@ -2,8 +2,12 @@ import { chat, eventSource, event_types } from '../../../script.js';
 import * as CoreState from '../core-state/index.js';
 import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 import { SlashCommand } from '../../slash-commands/SlashCommand.js';
-import { ARGUMENT_TYPE, SlashCommandNamedArgument } from '../../slash-commands/SlashCommandArgument.js';
+import {
+    ARGUMENT_TYPE,
+    SlashCommandNamedArgument,
+} from '../../slash-commands/SlashCommandArgument.js';
 import { commonEnumProviders } from '../../slash-commands/SlashCommandCommonEnumsProvider.js';
+import { debounce } from '../../utils.js';
 
 function personaName(){
     return SillyTavern?.getContext?.().character?.name
@@ -24,18 +28,26 @@ function stripHtml(html){
     return div.textContent || '';
 }
 
+const ctx = SillyTavern?.getContext?.() ?? {};
+const chatId = ctx.chat?.id || 'default';
+const STORAGE_KEY = `st.rpg.coreState.v1::${chatId}`;
+const saveSceneDebounced = debounce(() => {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(CoreState.getState()));
+    } catch (err) {
+        console.error('[RuleVault] save failed', err);
+    }
+}, 250);
+
 function coreSetScene(items){
     if(typeof CoreState.setScene === 'function'){
         CoreState.setScene(items);
     }else if(typeof CoreState.updateSceneObjects === 'function'){
         CoreState.updateSceneObjects(items);
     }else{
-        const ctx = SillyTavern?.getContext?.() ?? {};
-        const chatId = ctx.chat?.id || 'default';
-        const key = `st.rpg.coreState.v1::${chatId}`;
         const state = CoreState.getState();
         state.sceneObjects = items;
-        try{ localStorage.setItem(key, JSON.stringify(state)); }catch(err){ console.error('[RuleVault] save failed', err); }
+        saveSceneDebounced();
     }
     window.dispatchEvent(new CustomEvent('sceneUpdate', { detail:{ items } }));
 }
@@ -85,7 +97,7 @@ function handleCommand(cmd){
         if(cmd.args.item){
             const target = cmd.args.target || personaName();
             CoreState.addItem(target, cmd.args.item);
-            if(target === personaName()) removeSceneItem(cmd.args.item);
+            removeSceneItem(cmd.args.item);
             window.dispatchEvent(new CustomEvent('itemAdd', { detail:{ item: cmd.args.item } }));
         }
     }else if(cmd.verb === 'removeItem'){
@@ -162,20 +174,27 @@ function onMessage(id){
     const raw = mes.mes_html ? stripHtml(mes.mes_html) : mes.mes || '';
     const lines = String(raw).split(/\r?\n/);
     if(!lines.length) return;
-    let idx = lines.length - 1;
-    let last = lines[idx].trim();
-    while(idx > 0 && last === ''){
-        lines.pop();
-        idx = lines.length - 1;
-        last = lines[idx]?.trim();
+    const newLines = [];
+    let found = false;
+    for(const line of lines){
+        const idx = line.indexOf('::');
+        if(idx !== -1){
+            const tail = line.slice(idx).trim();
+            const cmds = parseCommands(tail);
+            if(cmds.length){
+                cmds.forEach(handleCommand);
+                const head = line.slice(0, idx).trimEnd();
+                if(head) newLines.push(head);
+                found = true;
+                continue;
+            }
+        }
+        newLines.push(line);
     }
-    if(!last || !last.startsWith('::')) return;
-    const cmds = parseCommands(last);
-    lines.pop();
-    const newText = lines.join('\n');
+    if(!found) return;
+    const newText = newLines.join('\n');
     mes.mes = newText;
-    if ('mes_html' in mes) mes.mes_html = newText;
-    cmds.forEach(cmd => handleCommand(cmd));
+    if('mes_html' in mes) mes.mes_html = newText;
 }
 
 function init(){
