@@ -1,4 +1,4 @@
-import { chat, eventSource, event_types } from '../../../script.js';
+import { chat, eventSource, event_types, comment_avatar, system_message_types } from '../../../script.js';
 import * as CoreState from '../core-state/index.js';
 import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 import { SlashCommand } from '../../slash-commands/SlashCommand.js';
@@ -17,8 +17,8 @@ function canon(id){
 
 function unknownItem(id){
     console.warn('[RuleVault] unknown item', id);
-    if(STRICT && window.toastr) {
-        toastr.error(`Unknown item: ${id}`, 'RuleVault');
+    if(STRICT) {
+        commentBubble(`Unknown item: ${id}`);
     }
 }
 
@@ -59,6 +59,28 @@ function removeInventoryItem(target, id){
 }
 
 const ctx = SillyTavern?.getContext?.() ?? {};
+
+function commentBubble(text){
+    const message = {
+        name: 'Note',
+        is_user: false,
+        is_system: true,
+        send_date: Date.now(),
+        mes: String(text),
+        force_avatar: comment_avatar,
+        extra: {
+            type: system_message_types.COMMENT,
+            gen_id: Date.now(),
+        },
+    };
+    chat.push(message);
+    const mid = chat.length - 1;
+    eventSource.emit(event_types.MESSAGE_SENT, mid);
+    ctx.addOneMessage?.(message);
+    eventSource.emit(event_types.USER_MESSAGE_RENDERED, mid);
+    ctx.saveChat?.();
+}
+
 const chatId = ctx.chat?.id || 'default';
 const STORAGE_KEY = `st.rpg.coreState.v1::${chatId}`;
 const saveSceneDebounced = debounce(() => {
@@ -104,8 +126,12 @@ function addSceneItem(item){
 function dropItem(target, item){
     const id = canon(item);
     if(!removeInventoryItem(target, id)){
-        unknownItem(item);
-        return;
+        if(STRICT){
+            commentBubble(`Unknown item: ${item}`);
+            return;
+        }
+        CoreState.addItem(target, id);
+        removeInventoryItem(target, id);
     }
     addSceneItem(id);
     window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: id } }));
@@ -118,15 +144,11 @@ function moveItem(from, to, item){
     let removed = false;
     if(src.toLowerCase() === 'scene'){
         removed = removeSceneItem(id);
-        if(!removed) unknownItem(item);
     }else{
         removed = removeInventoryItem(src, id);
-        if(!removed){
-            console.warn(`[RuleVault] ${item} missing from ${src}; minted automatically`);
-            if(STRICT && window.toastr){
-                toastr.warning(`${item} wasn't in ${src}'s inventory; minted and transferred automatically.`, 'RuleVault');
-            }
-        }
+    }
+    if(!removed && STRICT){
+        commentBubble(`${item} wasn't in ${src}; minted and transferred automatically.`);
     }
     CoreState.addItem(dst, id);
 }
@@ -155,10 +177,15 @@ function handleCommand(cmd){
         if(cmd.args.item){
             const target = cmd.args.target || personaName();
             const id = canon(cmd.args.item);
-            if(!removeSceneItem(id)){
-                unknownItem(cmd.args.item);
-                return;
+            const scene = CoreState.getState().sceneObjects || [];
+            if(!scene.find(it => canon(it) === id)){
+                if(STRICT){
+                    commentBubble(`Unknown item: ${cmd.args.item}`);
+                    return;
+                }
+                addSceneItem(id);
             }
+            removeSceneItem(id);
             CoreState.addItem(target, id);
             window.dispatchEvent(new CustomEvent('itemAdd', { detail:{ item: id } }));
         }
@@ -187,8 +214,24 @@ function handleCommand(cmd){
             const id = canon(cmd.args.item);
             let removed = false;
             if(target.toLowerCase() === 'scene'){
+                const scene = CoreState.getState().sceneObjects || [];
+                if(!scene.find(it => canon(it) === id)){
+                    if(STRICT){
+                        commentBubble(`Unknown item: ${cmd.args.item}`);
+                        return;
+                    }
+                    addSceneItem(id);
+                }
                 removed = removeSceneItem(id);
             } else {
+                const inv = CoreState.getState().characters?.[target]?.inventory || [];
+                if(!inv.find(it => canon(it) === id)){
+                    if(STRICT){
+                        commentBubble(`Unknown item: ${cmd.args.item}`);
+                        return;
+                    }
+                    CoreState.addItem(target, id);
+                }
                 removed = removeInventoryItem(target, id);
                 if(!removed){
                     removed = removeSceneItem(id);
@@ -196,8 +239,6 @@ function handleCommand(cmd){
             }
             if(removed){
                 window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: id } }));
-            } else {
-                unknownItem(cmd.args.item);
             }
         }
     }else if(cmd.verb === 'modHP'){
@@ -255,7 +296,7 @@ function parseCommands(line) {
 
 function onMessage(id){
     const mes = chat?.[id];
-    if(!mes || mes.is_user) return;
+    if(!mes || mes.is_user || mes.is_system) return;
     const raw = mes.mes_html ? stripHtml(mes.mes_html) : mes.mes || '';
     const lines = String(raw).split(/\r?\n/);
     if(!lines.length) return;
@@ -285,7 +326,10 @@ function onMessage(id){
         }
         newLines.push(line);
     }
-    if(!found) return;
+    if(!found){
+        commentBubble('[RuleVault] Missing control line \u2013 no mechanical changes processed.');
+        return;
+    }
     const newText = newLines.join('\n');
     mes.mes = newText;
     if('mes_html' in mes) mes.mes_html = newText;
