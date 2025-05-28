@@ -574,7 +574,7 @@ function init(){
     }));
 
     SlashCommandParser.addCommandObjectUnsafe(SlashCommand.fromProps({
-        name: '/selftest',
+        name: '/rulevault-selftest',
         callback: runSmokeTest,
         helpString: 'Run the RuleVault self-test.',
     }));
