@@ -178,8 +178,7 @@ function rulevaultSlash(_, sub, state){
     if(String(sub).toLowerCase() === 'strict'){
         const enable = String(state).toLowerCase() === 'on';
         STRICT = enable;
-        extension_settings.ruleVault = extension_settings.ruleVault || {};
-        extension_settings.ruleVault.strict = enable;
+        extension_settings.ruleVault = { strict: enable };
         saveSettingsDebounced();
         assistantBubble(enable ? '*Strict mode enabled*' : '*Strict mode disabled*');
     }
