@@ -1,5 +1,9 @@
 import { chat, eventSource, event_types } from '../../../script.js';
 import * as CoreState from '../core-state/index.js';
+import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
+import { SlashCommand } from '../../slash-commands/SlashCommand.js';
+import { ARGUMENT_TYPE, SlashCommandNamedArgument } from '../../slash-commands/SlashCommandArgument.js';
+import { commonEnumProviders } from '../../slash-commands/SlashCommandCommonEnumsProvider.js';
 
 function personaName(){
     return SillyTavern?.getContext?.().character?.name
@@ -55,6 +59,21 @@ function dropItem(target, item){
     CoreState.removeItem(target, item);
     addSceneItem(item);
     window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item } }));
+}
+
+function clearSceneSlash(){
+    coreSetScene([]);
+    return '';
+}
+
+function clearInventorySlash(args){
+    const target = args?.target || personaName();
+    const state = CoreState.getState();
+    const items = state.characters?.[target]?.inventory || [];
+    for(const item of items){
+        CoreState.removeItem(target, item);
+    }
+    return '';
 }
 
 function handleCommand(cmd){
@@ -161,6 +180,27 @@ function onMessage(id){
 
 function init(){
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessage);
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'clearscene',
+        callback: clearSceneSlash,
+        helpString: 'Removes all items from the current scene.',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'clearinv',
+        callback: clearInventorySlash,
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'target',
+                description: 'character name whose inventory will be cleared',
+                typeList: [ARGUMENT_TYPE.STRING],
+                enumProvider: commonEnumProviders.characters('character'),
+                isRequired: false,
+            }),
+        ],
+        helpString: 'Clears the inventory of the specified or current character.',
+    }));
 }
 
 if(document.readyState !== 'loading') init();
