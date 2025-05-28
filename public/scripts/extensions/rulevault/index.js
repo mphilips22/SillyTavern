@@ -48,7 +48,7 @@ function findInventoryItem(target, id){
     const name = target || personaName();
     const state = CoreState.getState();
     const inv = state.characters?.[name]?.inventory || [];
-    return inv.find(it => canon(it) === c);
+    return inv.find(it => canon(it)  ===  c);
 }
 
 function removeInventoryItem(target, id){
@@ -112,11 +112,11 @@ const saveSceneDebounced = debounce(() => {
 
 function coreSetScene(items){
     const canonItems = [...new Set(items.map(canon))];
-    if(typeof CoreState.setScene === 'function'){
+    if(typeof CoreState.setScene  ===  'function'){
         CoreState.setScene(canonItems); // event dispatched inside
         return;
     }
-    if(typeof CoreState.updateSceneObjects === 'function'){
+    if(typeof CoreState.updateSceneObjects  ===  'function'){
         CoreState.updateSceneObjects(canonItems);
     }else{
         const state = CoreState.getState();
@@ -129,8 +129,8 @@ function coreSetScene(items){
 function removeSceneItem(item){
     const c = canon(item);
     const state = CoreState.getState();
-    const items = (state.sceneObjects || []).filter(it => canon(it) !== c);
-    if(items.length !== (state.sceneObjects || []).length){
+    const items = (state.sceneObjects || []).filter(it => canon(it)  !==  c);
+    if(items.length  !==  (state.sceneObjects || []).length){
         coreSetScene(items);
         return true;
     }
@@ -182,7 +182,7 @@ function setStrictMode(enable){
 }
 
 function rulevaultSlash(_, sub){
-    if(String(sub).toLowerCase() === 'strict'){
+    if(String(sub).toLowerCase()  ===  'strict'){
         assistantBubble(STRICT ? '*Strict mode enabled*' : '*Strict mode disabled*');
     }
     return '';
@@ -190,13 +190,13 @@ function rulevaultSlash(_, sub){
 
 function handleCommand(cmd){
     if(!cmd) return;
-    if(cmd.verb === 'setScene'){
+    if(cmd.verb  ===  'setScene'){
         const items = parseItems(cmd.args.items);
         coreSetScene(items);
-    }else if(cmd.verb === 'removeItem'){
+    }else if(cmd.verb  ===  'removeItem'){
         if(cmd.args.item){
             const target = cmd.args.target || personaName();
-            if(target.toLowerCase() === 'scene'){
+            if(target.toLowerCase()  ===  'scene'){
                 if(removeSceneItem(cmd.args.item)){
                     window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: canon(cmd.args.item) } }));
                 } else {
@@ -206,14 +206,14 @@ function handleCommand(cmd){
                 dropItem(target, cmd.args.item);
             }
         }
-    }else if(cmd.verb === 'consumeItem'){
+    }else if(cmd.verb  ===  'consumeItem'){
         if(cmd.args.item){
             const target = cmd.args.target || personaName();
             const id = canon(cmd.args.item);
             let removed = false;
-            if(target.toLowerCase() === 'scene'){
+            if(target.toLowerCase()  ===  'scene'){
                 const scene = CoreState.getState().sceneObjects || [];
-                if(!scene.find(it => canon(it) === id)){
+                if(!scene.find(it => canon(it)  ===  id)){
                     if(STRICT){
                         commentBubble(`Unknown item: ${cmd.args.item}`);
                         return;
@@ -223,7 +223,7 @@ function handleCommand(cmd){
                 removed = removeSceneItem(id);
             } else {
                 const inv = CoreState.getState().characters?.[target]?.inventory || [];
-                if(!inv.find(it => canon(it) === id)){
+                if(!inv.find(it => canon(it)  ===  id)){
                     if(STRICT){
                         commentBubble(`Unknown item: ${cmd.args.item}`);
                         return;
@@ -239,23 +239,23 @@ function handleCommand(cmd){
                 window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: id } }));
             }
         }
-    }else if(cmd.verb === 'modHP'){
+    }else if(cmd.verb  ===  'modHP'){
         const target = cmd.args.target || personaName();
         const amount = parseInt(cmd.args.amount, 10) || 0;
         const reason = cmd.args.reason;
         CoreState.modHP(target, amount, reason);
-    }else if(cmd.verb === 'modMP'){
+    }else if(cmd.verb  ===  'modMP'){
         const target = cmd.args.target || personaName();
         const amount = parseInt(cmd.args.amount, 10) || 0;
         CoreState.modMP(target, amount);
-    }else if(cmd.verb === 'dropItem'){
+    }else if(cmd.verb  ===  'dropItem'){
         if(cmd.args.item){
             const target = cmd.args.target || personaName();
             dropItem(target, cmd.args.item);
         }
-    }else if(cmd.verb === 'clearScene'){
+    }else if(cmd.verb  ===  'clearScene'){
         coreSetScene([]);
-    }else if(cmd.verb === 'clearInv'){
+    }else if(cmd.verb  ===  'clearInv'){
         const target = cmd.args.target || personaName();
         const state = CoreState.getState();
         const items = state.characters?.[target]?.inventory || [];
@@ -278,7 +278,7 @@ function parseCommands(line) {
         const args = {};
         const re = /(\w+)=((?:"[^"]*"|'[^']*'|\[[^\]]*\]|\S+))/g;
         let match;
-        while ((match = re.exec(argStr)) !== null) {
+        while ((match = re.exec(argStr))  !==  null) {
             let val = match[2];
             if ((val.startsWith('"') && val.endsWith('"')) ||
                 (val.startsWith('\'') && val.endsWith('\''))) {
@@ -305,13 +305,13 @@ function processPacket(cmds){
 
     for(const cmd of cmds){
         if(!cmd) continue;
-        if(cmd.verb === 'newItem'){
+        if(cmd.verb  ===  'newItem'){
             if(cmd.args.label){
                 const id = canon(cmd.args.label);
                 scene.add(id);
                 actions.push(()=>addSceneItem(id));
             }
-        }else if(cmd.verb === 'addItem'){
+        }else if(cmd.verb  ===  'addItem'){
             if(cmd.args.item){
                 const id = canon(cmd.args.item);
                 const target = cmd.args.target || personaName();
@@ -319,48 +319,48 @@ function processPacket(cmds){
                 ensureInv(target); inv[target].add(id);
                 actions.push(()=>{ removeSceneItem(id); CoreState.addItem(target,id); });
             }
-        }else if(cmd.verb === 'moveItem'){
+        }else if(cmd.verb  ===  'moveItem'){
             if(cmd.args.item){
                 const id = canon(cmd.args.item);
                 const src = cmd.args.from || personaName();
                 const dst = cmd.args.to || personaName();
-                const sset = src.toLowerCase() === 'scene' ? scene : (ensureInv(src), inv[src]);
-                const dset = dst.toLowerCase() === 'scene' ? scene : (ensureInv(dst), inv[dst]);
+                const sset = src.toLowerCase()  ===  'scene' ? scene : (ensureInv(src), inv[src]);
+                const dset = dst.toLowerCase()  ===  'scene' ? scene : (ensureInv(dst), inv[dst]);
                 if(!sset.delete(id)) pending.push({ id, raw: cmd.args.item });
                 dset.add(id);
                 actions.push(()=>{
-                    if(src.toLowerCase() === 'scene') removeSceneItem(id); else CoreState.removeItem(src, id);
-                    if(dst.toLowerCase() === 'scene') addSceneItem(id); else CoreState.addItem(dst, id);
+                    if(src.toLowerCase()  ===  'scene') removeSceneItem(id); else CoreState.removeItem(src, id);
+                    if(dst.toLowerCase()  ===  'scene') addSceneItem(id); else CoreState.addItem(dst, id);
                 });
             }
         }else{
             actions.push(()=>handleCommand(cmd));
-            if(cmd.verb === 'setScene'){
+            if(cmd.verb  ===  'setScene'){
                 scene.clear();
                 for(const it of parseItems(cmd.args.items)) scene.add(canon(it));
-            }else if(cmd.verb === 'removeItem'){
+            }else if(cmd.verb  ===  'removeItem'){
                 if(cmd.args.item){
                     const target = cmd.args.target || personaName();
                     const id = canon(cmd.args.item);
-                    if (target.toLowerCase() === 'scene') scene.delete(id); else { ensureInv(target); inv[target].delete(id); }
+                    if (target.toLowerCase()  ===  'scene') scene.delete(id); else { ensureInv(target); inv[target].delete(id); }
                 }
-            }else if(cmd.verb === 'consumeItem'){
+            }else if(cmd.verb  ===  'consumeItem'){
                 if(cmd.args.item){
                     const target = cmd.args.target || personaName();
                     const id = canon(cmd.args.item);
-                    if (target.toLowerCase() === 'scene') scene.delete(id); else {
+                    if (target.toLowerCase()  ===  'scene') scene.delete(id); else {
                         ensureInv(target); if (!inv[target].delete(id)) scene.delete(id);
                     }
                 }
-            }else if(cmd.verb === 'dropItem'){
+            }else if(cmd.verb  ===  'dropItem'){
                 if(cmd.args.item){
                     const target = cmd.args.target || personaName();
                     const id = canon(cmd.args.item);
                     ensureInv(target); inv[target].delete(id); scene.add(id);
                 }
-            }else if(cmd.verb === 'clearScene'){
+            }else if(cmd.verb  ===  'clearScene'){
                 scene.clear();
-            }else if(cmd.verb === 'clearInv'){
+            }else if(cmd.verb  ===  'clearInv'){
                 const target = cmd.args.target || personaName();
                 ensureInv(target); inv[target].clear();
             }
@@ -389,11 +389,11 @@ function onMessage(id){
     let found = false;
     for(const line of lines){
         const idx = line.indexOf('::');
-        if(idx !== -1){
+        if(idx  !==  -1){
             let tail = line.slice(idx);
             let remainder = '';
             const closeIdx = tail.search(/<\/\w+>/);
-            if(closeIdx !== -1){
+            if(closeIdx  !==  -1){
                 remainder = tail.slice(closeIdx).replace(/<[^>]*>/g, '');
                 tail = tail.slice(0, closeIdx).trim();
             }else{
@@ -420,8 +420,110 @@ function onMessage(id){
     if('mes_html' in mes) mes.mes_html = newText;
 }
 
+async function runSmokeTest(){
+    const events = { sceneUpdate:0, itemAdd:0, itemRemove:0 };
+    const handlers = {
+        sceneUpdate: () => events.sceneUpdate++,
+        itemAdd: () => events.itemAdd++,
+        itemRemove: () => events.itemRemove++,
+    };
+    for(const [ev,fn] of Object.entries(handlers)) window.addEventListener(ev, fn);
+
+    let step = 0;
+    const snap = () => ({ ...events });
+    const delta = (before) => ({
+        sceneUpdate: events.sceneUpdate - before.sceneUpdate,
+        itemAdd: events.itemAdd - before.itemAdd,
+        itemRemove: events.itemRemove - before.itemRemove,
+    });
+    try{
+        step = 1;
+        CoreState.clearState();
+        let state = CoreState.getState();
+        console.assert(!state.sceneObjects.length && Object.values(state.characters).every(c => !(c.inventory || []).length), 'state not empty after clear');
+        if(state.sceneObjects.length || !Object.values(state.characters).every(c => !(c.inventory || []).length)) throw new Error('initial clear failed');
+
+        step = 2;
+        let before = snap();
+        onMessage(chat.push({ is_user: false, mes: '::setScene items=[Apple]' }) - 1);
+        state = CoreState.getState();
+        console.assert(state.sceneObjects.length === 1 && state.sceneObjects[0] === 'apple', 'scene set');
+        let d = delta(before);
+        console.assert(d.sceneUpdate === 1 && d.itemAdd === 0 && d.itemRemove === 0, 'event count');
+        if(!(state.sceneObjects.length === 1 && state.sceneObjects[0] === 'apple' && d.sceneUpdate === 1 && d.itemAdd === 0 && d.itemRemove === 0)) throw new Error('scene setup');
+
+        step = 3;
+        before = snap();
+        onMessage(chat.push({ is_user: false, mes: `::addItem target=${personaName()} item=Apple` }) - 1);
+        state = CoreState.getState();
+        d = delta(before);
+        console.assert(!state.sceneObjects.includes('apple') && state.characters[personaName()].inventory.includes('apple'), 'apple transfer');
+        console.assert(d.sceneUpdate === 1 && d.itemAdd === 1 && d.itemRemove === 0, 'event count');
+        if(state.sceneObjects.includes('apple') || !state.characters[personaName()].inventory.includes('apple') || d.sceneUpdate !== 1 || d.itemAdd !== 1 || d.itemRemove !== 0) throw new Error('addItem failed');
+
+        step = 4;
+        before = snap();
+        onMessage(chat.push({ is_user: false, mes: `::dropItem target=${personaName()} item=Apple` }) - 1);
+        state = CoreState.getState();
+        d = delta(before);
+        console.assert(state.sceneObjects.includes('apple') && !state.characters[personaName()].inventory.includes('apple'), 'drop');
+        console.assert(d.sceneUpdate === 1 && d.itemAdd === 0 && d.itemRemove === 1, 'event count');
+        if(!state.sceneObjects.includes('apple') || state.characters[personaName()].inventory.includes('apple') || d.sceneUpdate !== 1 || d.itemAdd !== 0 || d.itemRemove !== 1) throw new Error('dropItem failed');
+
+        step = 5;
+        before = snap();
+        const preLen = chat.length;
+        onMessage(chat.push({ is_user: false, mes: `::addItem target=${personaName()} item=FakeGem` }) - 1);
+        state = CoreState.getState();
+        d = delta(before);
+        const last = chat[chat.length - 1];
+        const bubble = chat.length === preLen + 1 && last?.extra?.type === system_message_types.COMMENT;
+        console.assert(!state.characters[personaName()].inventory.includes('fakegem') && bubble, 'strict block');
+        console.assert(d.sceneUpdate === 0 && d.itemAdd === 0 && d.itemRemove === 0, 'event count');
+        if(state.characters[personaName()].inventory.includes('fakegem') || !bubble || d.sceneUpdate !== 0 || d.itemAdd !== 0 || d.itemRemove !== 0) throw new Error('strict mode block');
+
+        step = 6;
+        STRICT = false;
+        before = snap();
+        onMessage(chat.push({ is_user: false, mes: `::addItem target=${personaName()} item=FakeGem` }) - 1);
+        state = CoreState.getState();
+        d = delta(before);
+        console.assert(state.characters[personaName()].inventory.includes('fakegem'), 'strict off add');
+        console.assert(d.sceneUpdate === 0 && d.itemAdd === 1 && d.itemRemove === 0, 'event count');
+        if(!state.characters[personaName()].inventory.includes('fakegem') || d.sceneUpdate !== 0 || d.itemAdd !== 1 || d.itemRemove !== 0) throw new Error('strict off add');
+
+        step = 7;
+        before = snap();
+        onMessage(chat.push({ is_user: false, mes: `::newItem label="Copper Ring" type=quest; addItem target=${personaName()} item=CopperRing` }) - 1);
+        state = CoreState.getState();
+        d = delta(before);
+        console.assert(state.characters[personaName()].inventory.includes('copperring') && !state.sceneObjects.includes('copperring'), 'newItem add');
+        console.assert(d.sceneUpdate === 1 && d.itemAdd === 1 && d.itemRemove === 0, 'event count');
+        if(!state.characters[personaName()].inventory.includes('copperring') || state.sceneObjects.includes('copperring') || d.sceneUpdate !== 1 || d.itemAdd !== 1 || d.itemRemove !== 0) throw new Error('newItem add');
+
+        step = 8;
+        before = snap();
+        onMessage(chat.push({ is_user: false, mes: '::setScene items=[Torch]' }) - 1);
+        state = CoreState.getState();
+        d = delta(before);
+        console.assert(state.sceneObjects.length === 1 && state.sceneObjects[0] === 'torch' && !state.sceneObjects.includes('apple'), 'scene replace');
+        console.assert(d.sceneUpdate === 1 && d.itemAdd === 0 && d.itemRemove === 0, 'event count');
+        if(state.sceneObjects.length !== 1 || state.sceneObjects[0] !== 'torch' || state.sceneObjects.includes('apple') || d.sceneUpdate !== 1 || d.itemAdd !== 0 || d.itemRemove !== 0) throw new Error('setScene final');
+
+        step = 9;
+        assistantBubble('*RuleVault self-test: 9/9 checks passed ✔️*');
+    }catch(err){
+        const msg = step ? `FAILED at step ${step}: ${err.message}` : `aborted: ${err.message}`;
+        assistantBubble(`*RuleVault self-test ${msg} ❌*`);
+    }finally{
+        for(const [ev,fn] of Object.entries(handlers)) window.removeEventListener(ev, fn);
+        CoreState.clearState();
+    }
+    return '';
+}
+
 function init(){
-    STRICT = extension_settings?.ruleVault?.strict !== false;
+    STRICT = extension_settings?.ruleVault?.strict  !==  false;
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessage);
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
@@ -470,14 +572,20 @@ function init(){
         ],
         helpString: 'Clears the inventory of the specified or current character.',
     }));
+
+    SlashCommandParser.addCommandObjectUnsafe(SlashCommand.fromProps({
+        name: '/selftest',
+        callback: runSmokeTest,
+        helpString: 'Run the RuleVault self-test.',
+    }));
 }
 
-if(document.readyState !== 'loading') init();
+if(document.readyState  !==  'loading') init();
 else document.addEventListener('DOMContentLoaded', init, { once:true });
 
 export {};
 
-/* ===== RuleVault smoke test =====
+/*  === == RuleVault smoke test  === ==
 CoreState.clearState();
 onMessage(chat.push({is_user:false,mes:"::newItem label=Rapier; addItem target=Player item=Rapier"})-1);
 console.assert(CoreState.getState().characters[personaName()].inventory.includes('rapier'),'add');
