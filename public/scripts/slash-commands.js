@@ -2363,26 +2363,7 @@ export function initDefaultSlashCommands() {
         helpString: 'Copies the provided text to the OS clipboard. Returns an empty string.',
     }));
 
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'clearscene',
-        callback: clearSceneCallback,
-        helpString: 'Removes all items from the current scene.',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'clearinv',
-        callback: clearInventoryCallback,
-        namedArgumentList: [
-            SlashCommandNamedArgument.fromProps({
-                name: 'target',
-                description: 'character name whose inventory will be cleared',
-                typeList: [ARGUMENT_TYPE.STRING],
-                enumProvider: commonEnumProviders.characters('character'),
-                isRequired: false,
-            }),
-        ],
-        helpString: 'Clears the inventory of the specified or current character.',
-    }));
+    // The clear scene and inventory commands have moved to the RuleVault extension
 
     registerVariableCommands();
 }
@@ -3792,23 +3773,7 @@ async function setNarratorName(_, text) {
     return '';
 }
 
-async function clearSceneCallback() {
-    if (window.CoreState?.setScene) {
-        window.CoreState.setScene([]);
-    }
-    return '';
-}
 
-async function clearInventoryCallback(args) {
-    if (!window.CoreState) return '';
-    const target = args?.target || window.CoreState.playerName;
-    const state = window.CoreState.getState();
-    const items = state.characters?.[target]?.inventory || [];
-    for (const item of items) {
-        window.CoreState.removeItem(target, item);
-    }
-    return '';
-}
 
 /**
  * Checks if an argument is a string array (or undefined), and if not, throws an error

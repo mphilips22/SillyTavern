@@ -99,6 +99,15 @@ function handleCommand(cmd){
             const target = cmd.args.target || personaName();
             dropItem(target, cmd.args.item);
         }
+    }else if(cmd.verb === 'clearScene'){
+        coreSetScene([]);
+    }else if(cmd.verb === 'clearInv'){
+        const target = cmd.args.target || personaName();
+        const state = CoreState.getState();
+        const items = state.characters?.[target]?.inventory || [];
+        for (const item of items) {
+            CoreState.removeItem(target, item);
+        }
     }
 }
 
