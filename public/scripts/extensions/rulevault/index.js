@@ -74,10 +74,10 @@ function handleCommand(cmd){
             const target = cmd.args.target || personaName();
             if(target.toLowerCase() === 'scene'){
                 removeSceneItem(cmd.args.item);
+                window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: cmd.args.item } }));
             }else{
-                CoreState.removeItem(target, cmd.args.item);
+                dropItem(target, cmd.args.item);
             }
-            window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: cmd.args.item } }));
         }
     }else if(cmd.verb === 'consumeItem'){
         if(cmd.args.item){
@@ -85,6 +85,15 @@ function handleCommand(cmd){
             CoreState.removeItem(target, cmd.args.item);
             window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: cmd.args.item } }));
         }
+    }else if(cmd.verb === 'modHP'){
+        const target = cmd.args.target || personaName();
+        const amount = parseInt(cmd.args.amount, 10) || 0;
+        const reason = cmd.args.reason;
+        CoreState.modHP(target, amount, reason);
+    }else if(cmd.verb === 'modMP'){
+        const target = cmd.args.target || personaName();
+        const amount = parseInt(cmd.args.amount, 10) || 0;
+        CoreState.modMP(target, amount);
     }else if(cmd.verb === 'dropItem'){
         if(cmd.args.item){
             const target = cmd.args.target || personaName();
