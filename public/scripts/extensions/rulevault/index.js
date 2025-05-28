@@ -174,13 +174,16 @@ function clearInventorySlash(args){
     return '';
 }
 
-function rulevaultSlash(_, sub, state){
+function setStrictMode(enable){
+    STRICT = enable;
+    extension_settings.ruleVault = { strict: enable };
+    saveSettingsDebounced();
+    assistantBubble(enable ? '*Strict mode enabled*' : '*Strict mode disabled*');
+}
+
+function rulevaultSlash(_, sub){
     if(String(sub).toLowerCase() === 'strict'){
-        const enable = String(state).toLowerCase() === 'on';
-        STRICT = enable;
-        extension_settings.ruleVault = { strict: enable };
-        saveSettingsDebounced();
-        assistantBubble(enable ? '*Strict mode enabled*' : '*Strict mode disabled*');
+        assistantBubble(STRICT ? '*Strict mode enabled*' : '*Strict mode disabled*');
     }
     return '';
 }
@@ -437,14 +440,20 @@ function init(){
                 forceEnum: true,
                 isRequired: true,
             }),
-            SlashCommandArgument.fromProps({
-                description: 'value',
-                enumList: ['on', 'off'],
-                forceEnum: true,
-                isRequired: true,
-            }),
         ],
-        helpString: 'Toggle RuleVault strict mode.',
+        helpString: 'Show RuleVault status information.',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'rulevault-strict-on',
+        callback: () => { setStrictMode(true); return ''; },
+        helpString: 'Enable RuleVault strict mode.',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'rulevault-strict-off',
+        callback: () => { setStrictMode(false); return ''; },
+        helpString: 'Disable RuleVault strict mode.',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
