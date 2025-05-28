@@ -13,6 +13,13 @@ function parseItems(str){
     return clean.split(',').map(s=>s.trim()).filter(Boolean);
 }
 
+function stripHtml(html){
+    if(!html) return '';
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.textContent || '';
+}
+
 function coreSetScene(items){
     if(typeof CoreState.setScene === 'function'){
         CoreState.setScene(items);
@@ -37,6 +44,19 @@ function removeSceneItem(item){
     }
 }
 
+function addSceneItem(item){
+    const state = CoreState.getState();
+    const items = new Set(state.sceneObjects || []);
+    items.add(item);
+    coreSetScene([...items]);
+}
+
+function dropItem(target, item){
+    CoreState.removeItem(target, item);
+    addSceneItem(item);
+    window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item } }));
+}
+
 function handleCommand(cmd){
     if(!cmd) return;
     if(cmd.verb === 'setScene'){
@@ -58,6 +78,17 @@ function handleCommand(cmd){
                 CoreState.removeItem(target, cmd.args.item);
             }
             window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: cmd.args.item } }));
+        }
+    }else if(cmd.verb === 'consumeItem'){
+        if(cmd.args.item){
+            const target = cmd.args.target || personaName();
+            CoreState.removeItem(target, cmd.args.item);
+            window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: cmd.args.item } }));
+        }
+    }else if(cmd.verb === 'dropItem'){
+        if(cmd.args.item){
+            const target = cmd.args.target || personaName();
+            dropItem(target, cmd.args.item);
         }
     }
 }
@@ -91,7 +122,8 @@ function parseCommands(line) {
 function onMessage(id){
     const mes = chat?.[id];
     if(!mes || mes.is_user) return;
-    const lines = String(mes.mes || '').split(/\r?\n/);
+    const raw = mes.mes_html ? stripHtml(mes.mes_html) : mes.mes || '';
+    const lines = String(raw).split(/\r?\n/);
     if(!lines.length) return;
     let idx = lines.length - 1;
     let last = lines[idx].trim();
