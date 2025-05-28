@@ -573,8 +573,8 @@ function init(){
         helpString: 'Clears the inventory of the specified or current character.',
     }));
 
-    SlashCommandParser.addCommandObjectUnsafe(SlashCommand.fromProps({
-        name: '/rulevault-selftest',
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'rulevault-selftest',
         callback: runSmokeTest,
         helpString: 'Run the RuleVault self-test.',
     }));
