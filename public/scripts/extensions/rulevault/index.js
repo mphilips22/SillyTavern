@@ -111,6 +111,26 @@ function dropItem(target, item){
     window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: id } }));
 }
 
+function moveItem(from, to, item){
+    const src = from || personaName();
+    const dst = to || personaName();
+    const id = canon(item);
+    let removed = false;
+    if(src.toLowerCase() === 'scene'){
+        removed = removeSceneItem(id);
+        if(!removed) unknownItem(item);
+    }else{
+        removed = removeInventoryItem(src, id);
+        if(!removed){
+            console.warn(`[RuleVault] ${item} missing from ${src}; minted automatically`);
+            if(STRICT && window.toastr){
+                toastr.warning(`${item} wasn't in ${src}'s inventory; minted and transferred automatically.`, 'RuleVault');
+            }
+        }
+    }
+    CoreState.addItem(dst, id);
+}
+
 function clearSceneSlash(){
     coreSetScene([]);
     return '';
@@ -154,6 +174,12 @@ function handleCommand(cmd){
             }else{
                 dropItem(target, cmd.args.item);
             }
+        }
+    }else if(cmd.verb === 'moveItem'){
+        if(cmd.args.item){
+            const src = cmd.args.from || personaName();
+            const dst = cmd.args.to || personaName();
+            moveItem(src, dst, cmd.args.item);
         }
     }else if(cmd.verb === 'consumeItem'){
         if(cmd.args.item){
