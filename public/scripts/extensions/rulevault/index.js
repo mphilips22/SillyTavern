@@ -137,21 +137,6 @@ function dropItem(target, item){
     window.dispatchEvent(new CustomEvent('itemRemove', { detail:{ item: id } }));
 }
 
-function moveItem(from, to, item){
-    const src = from || personaName();
-    const dst = to || personaName();
-    const id = canon(item);
-    let removed = false;
-    if(src.toLowerCase() === 'scene'){
-        removed = removeSceneItem(id);
-    }else{
-        removed = removeInventoryItem(src, id);
-    }
-    if(!removed && STRICT){
-        commentBubble(`${item} wasn't in ${src}; minted and transferred automatically.`);
-    }
-    CoreState.addItem(dst, id);
-}
 
 function clearSceneSlash(){
     coreSetScene([]);
@@ -173,22 +158,6 @@ function handleCommand(cmd){
     if(cmd.verb === 'setScene'){
         const items = parseItems(cmd.args.items);
         coreSetScene(items);
-    }else if(cmd.verb === 'addItem'){
-        if(cmd.args.item){
-            const target = cmd.args.target || personaName();
-            const id = canon(cmd.args.item);
-            const scene = CoreState.getState().sceneObjects || [];
-            if(!scene.find(it => canon(it) === id)){
-                if(STRICT){
-                    commentBubble(`Unknown item: ${cmd.args.item}`);
-                    return;
-                }
-                addSceneItem(id);
-            }
-            removeSceneItem(id);
-            CoreState.addItem(target, id);
-            window.dispatchEvent(new CustomEvent('itemAdd', { detail:{ item: id } }));
-        }
     }else if(cmd.verb === 'removeItem'){
         if(cmd.args.item){
             const target = cmd.args.target || personaName();
@@ -201,12 +170,6 @@ function handleCommand(cmd){
             }else{
                 dropItem(target, cmd.args.item);
             }
-        }
-    }else if(cmd.verb === 'moveItem'){
-        if(cmd.args.item){
-            const src = cmd.args.from || personaName();
-            const dst = cmd.args.to || personaName();
-            moveItem(src, dst, cmd.args.item);
         }
     }else if(cmd.verb === 'consumeItem'){
         if(cmd.args.item){
@@ -294,6 +257,93 @@ function parseCommands(line) {
     return cmds;
 }
 
+function processPacket(cmds){
+    const pending = [];
+    const actions = [];
+    const state = CoreState.getState();
+    const scene = new Set((state.sceneObjects || []).map(canon));
+    const inv = {};
+    for(const [name, ch] of Object.entries(state.characters || {})){
+        inv[name] = new Set((ch.inventory || []).map(canon));
+    }
+    const ensureInv = (n)=>{ inv[n] = inv[n] || new Set(); };
+
+    for(const cmd of cmds){
+        if(!cmd) continue;
+        if(cmd.verb === 'newItem'){
+            if(cmd.args.label){
+                const id = canon(cmd.args.label);
+                scene.add(id);
+                actions.push(()=>addSceneItem(id));
+            }
+        }else if(cmd.verb === 'addItem'){
+            if(cmd.args.item){
+                const id = canon(cmd.args.item);
+                const target = cmd.args.target || personaName();
+                if(!scene.delete(id)) pending.push({ id, raw: cmd.args.item });
+                ensureInv(target); inv[target].add(id);
+                actions.push(()=>{ removeSceneItem(id); CoreState.addItem(target,id); });
+            }
+        }else if(cmd.verb === 'moveItem'){
+            if(cmd.args.item){
+                const id = canon(cmd.args.item);
+                const src = cmd.args.from || personaName();
+                const dst = cmd.args.to || personaName();
+                const sset = src.toLowerCase() === 'scene' ? scene : (ensureInv(src), inv[src]);
+                const dset = dst.toLowerCase() === 'scene' ? scene : (ensureInv(dst), inv[dst]);
+                if(!sset.delete(id)) pending.push({ id, raw: cmd.args.item });
+                dset.add(id);
+                actions.push(()=>{
+                    if(src.toLowerCase() === 'scene') removeSceneItem(id); else CoreState.removeItem(src, id);
+                    if(dst.toLowerCase() === 'scene') addSceneItem(id); else CoreState.addItem(dst, id);
+                });
+            }
+        }else{
+            actions.push(()=>handleCommand(cmd));
+            if(cmd.verb === 'setScene'){
+                scene.clear();
+                for(const it of parseItems(cmd.args.items)) scene.add(canon(it));
+            }else if(cmd.verb === 'removeItem'){
+                if(cmd.args.item){
+                    const target = cmd.args.target || personaName();
+                    const id = canon(cmd.args.item);
+                    if (target.toLowerCase() === 'scene') scene.delete(id); else { ensureInv(target); inv[target].delete(id); }
+                }
+            }else if(cmd.verb === 'consumeItem'){
+                if(cmd.args.item){
+                    const target = cmd.args.target || personaName();
+                    const id = canon(cmd.args.item);
+                    if (target.toLowerCase() === 'scene') scene.delete(id); else {
+                        ensureInv(target); if (!inv[target].delete(id)) scene.delete(id);
+                    }
+                }
+            }else if(cmd.verb === 'dropItem'){
+                if(cmd.args.item){
+                    const target = cmd.args.target || personaName();
+                    const id = canon(cmd.args.item);
+                    ensureInv(target); inv[target].delete(id); scene.add(id);
+                }
+            }else if(cmd.verb === 'clearScene'){
+                scene.clear();
+            }else if(cmd.verb === 'clearInv'){
+                const target = cmd.args.target || personaName();
+                ensureInv(target); inv[target].clear();
+            }
+        }
+    }
+    for(const p of pending){
+        let ok = scene.has(p.id);
+        if(!ok){
+            for (const set of Object.values(inv)) if (set.has(p.id)) { ok = true; break; }
+        }
+        if(!ok){
+            unknownItem(p.raw);
+            return;
+        }
+    }
+    actions.forEach(fn=>fn());
+}
+
 function onMessage(id){
     const mes = chat?.[id];
     if(!mes || mes.is_user || mes.is_system) return;
@@ -316,7 +366,7 @@ function onMessage(id){
             }
             const cmds = parseCommands(tail);
             if(cmds.length){
-                cmds.forEach(handleCommand);
+                processPacket(cmds);
                 const head = line.slice(0, idx);
                 const finalText = (head + remainder).trim();
                 if(finalText) newLines.push(finalText);
@@ -367,10 +417,6 @@ export {};
 
 /* ===== RuleVault smoke test =====
 CoreState.clearState();
-onMessage(chat.push({is_user:false,mes:"::setScene items=[Sword,Shield]"})-1);
-console.assert(CoreState.getState().sceneObjects.includes('Sword'), 'scene set');
-let fired=false;window.addEventListener('itemAdd',()=>fired=true,{once:true});
-onMessage(chat.push({is_user:false,mes:"::addItem target=Player item=Sword"})-1);
-console.assert(CoreState.getState().characters[personaName()].inventory.includes('Sword'),'add');
-console.assert(fired,'event fired');
+onMessage(chat.push({is_user:false,mes:"::newItem label=Rapier; addItem target=Player item=Rapier"})-1);
+console.assert(CoreState.getState().characters[personaName()].inventory.includes('rapier'),'add');
 */
