@@ -90,7 +90,8 @@ function renderSceneObjects(arr = []) {
 }
 
 function updatePanel(div) {
-    const state = CoreState.getState(CoreState.playerName) || {};
+    const rootState = CoreState.getState();
+    const state = rootState.characters?.[CoreState.playerName] || {};
     div.querySelector('.hud-avatar').src = getUserAvatar(user_avatar);
     div.querySelector('.hud-name').textContent = name1;
     const hp = div.querySelector('.hud-hp');
@@ -118,7 +119,7 @@ function updatePanel(div) {
         });
         invSum.textContent = `Inventory (${(state.inventory || []).length})`;
     }
-    renderSceneObjects(state.sceneObjects || []);
+    renderSceneObjects(rootState.sceneObjects || []);
 }
 
 export function init() {
