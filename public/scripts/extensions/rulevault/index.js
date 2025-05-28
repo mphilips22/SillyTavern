@@ -8,10 +8,25 @@ import {
     SlashCommandArgument,
 } from '../../slash-commands/SlashCommandArgument.js';
 import { commonEnumProviders } from '../../slash-commands/SlashCommandCommonEnumsProvider.js';
-import { debounce } from '../../utils.js';
+import { debounce, setValueByPath } from '../../utils.js';
 import { extension_settings } from '../../extensions.js';
 
-let STRICT = true;
+function loadExtensionSetting(path, def) {
+    const parts = path.split('.');
+    let obj = extension_settings;
+    for (let i = 0; i < parts.length - 1; i++) {
+        obj = obj[parts[i]] = obj[parts[i]] || {};
+    }
+    const key = parts[parts.length - 1];
+    if (obj[key] === undefined) obj[key] = def;
+    return obj[key];
+}
+
+function saveExtensionSetting(path, value){
+    setValueByPath(extension_settings, path, value);
+    saveSettingsDebounced();
+}
+let STRICT = loadExtensionSetting('ruleVault.strict', true);
 
 function canon(id){
     return String(id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -168,13 +183,15 @@ function clearInventorySlash(args){
 
 function setStrictMode(enable){
     STRICT = enable;
-    extension_settings.ruleVault = { strict: enable };
-    saveSettingsDebounced();
+    saveExtensionSetting('ruleVault.strict', enable);
     assistantBubble(enable ? '*Strict mode enabled*' : '*Strict mode disabled*');
 }
 
-function rulevaultSlash(_, sub){
-    if(String(sub).toLowerCase()  ===  'strict'){
+function rulevaultStrictSlash(_, state){
+    const token = String(state || '').toLowerCase();
+    if(token === 'on' || token === 'off'){
+        setStrictMode(token === 'on');
+    }else{
         assistantBubble(STRICT ? '*Strict mode enabled*' : '*Strict mode disabled*');
     }
     return '';
@@ -359,7 +376,6 @@ function processPacket(cmds){
         }
     }
     if (STRICT && pending.length){
-        actions.length = 0;
         assistantBubble(`*Unknown item: ${pending[0].raw}*`);
         return;
     }
@@ -510,7 +526,6 @@ async function runSmokeTest(){
 }
 
 function init(){
-    STRICT = extension_settings?.ruleVault?.strict  !==  false;
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessage);
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
@@ -520,29 +535,17 @@ function init(){
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'rulevault',
-        callback: rulevaultSlash,
+        name: 'rulevault-strict',
+        callback: rulevaultStrictSlash,
         unnamedArgumentList: [
             SlashCommandArgument.fromProps({
-                description: 'subcommand',
-                enumList: ['strict'],
+                description: 'on | off',
+                enumList: ['on', 'off'],
                 forceEnum: true,
-                isRequired: true,
+                isRequired: false,
             }),
         ],
-        helpString: 'Show RuleVault status information.',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'rulevault-strict-on',
-        callback: () => { setStrictMode(true); return ''; },
-        helpString: 'Enable RuleVault strict mode.',
-    }));
-
-    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
-        name: 'rulevault-strict-off',
-        callback: () => { setStrictMode(false); return ''; },
-        helpString: 'Disable RuleVault strict mode.',
+        helpString: 'Toggle RuleVault strict mode or show current status.',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
@@ -569,6 +572,10 @@ function init(){
 
 if(document.readyState  !==  'loading') init();
 else document.addEventListener('DOMContentLoaded', init, { once:true });
+
+window.RuleVault = Object.assign(window.RuleVault || {}, {
+    getStrict: () => STRICT,
+});
 
 export {};
 
