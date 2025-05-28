@@ -1,10 +1,11 @@
-import { chat, eventSource, event_types, comment_avatar, system_message_types } from '../../../script.js';
+import { chat, eventSource, event_types, comment_avatar, system_message_types, saveSettingsDebounced } from '../../../script.js';
 import * as CoreState from '../core-state/index.js';
 import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 import { SlashCommand } from '../../slash-commands/SlashCommand.js';
 import {
     ARGUMENT_TYPE,
     SlashCommandNamedArgument,
+    SlashCommandArgument,
 } from '../../slash-commands/SlashCommandArgument.js';
 import { commonEnumProviders } from '../../slash-commands/SlashCommandCommonEnumsProvider.js';
 import { debounce } from '../../utils.js';
@@ -82,6 +83,23 @@ function commentBubble(text){
     ctx.saveChat?.();
 }
 
+function assistantBubble(text){
+    const message = {
+        name: 'RuleVault',
+        is_user: false,
+        is_system: false,
+        send_date: Date.now(),
+        mes: String(text),
+        extra: { type: system_message_types.ASSISTANT_MESSAGE },
+    };
+    chat.push(message);
+    const mid = chat.length - 1;
+    eventSource.emit(event_types.MESSAGE_RECEIVED, mid, 'extension');
+    ctx.addOneMessage?.(message);
+    eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, mid, 'extension');
+    ctx.saveChat?.();
+}
+
 const chatId = ctx.chat?.id || 'default';
 const STORAGE_KEY = `st.rpg.coreState.v1::${chatId}`;
 const saveSceneDebounced = debounce(() => {
@@ -152,6 +170,18 @@ function clearInventorySlash(args){
     const items = state.characters?.[target]?.inventory || [];
     for(const item of items){
         CoreState.removeItem(target, item);
+    }
+    return '';
+}
+
+function rulevaultSlash(_, sub, state){
+    if(String(sub).toLowerCase() === 'strict'){
+        const enable = String(state).toLowerCase() === 'on';
+        STRICT = enable;
+        extension_settings.ruleVault = extension_settings.ruleVault || {};
+        extension_settings.ruleVault.strict = enable;
+        saveSettingsDebounced();
+        assistantBubble(enable ? '*Strict mode enabled*' : '*Strict mode disabled*');
     }
     return '';
 }
@@ -396,6 +426,26 @@ function init(){
         name: 'clearscene',
         callback: clearSceneSlash,
         helpString: 'Removes all items from the current scene.',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'rulevault',
+        callback: rulevaultSlash,
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'subcommand',
+                enumList: ['strict'],
+                forceEnum: true,
+                isRequired: true,
+            }),
+            SlashCommandArgument.fromProps({
+                description: 'value',
+                enumList: ['on', 'off'],
+                forceEnum: true,
+                isRequired: true,
+            }),
+        ],
+        helpString: 'Toggle RuleVault strict mode.',
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
