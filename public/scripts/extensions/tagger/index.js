@@ -85,10 +85,12 @@ function autoBracket(el){
     for(let n=walker.nextNode(); n; n=walker.nextNode()){
         let txt = n.nodeValue;
         for(const label of labels){
-            const esc = label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+            const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const spaced = label.replace(/([a-z])([A-Z])/g, '$1 $2');
+            const spacedEsc = spaced.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const brk = new RegExp(`\\[\\s*${esc}\\s*\\]`, 'i');
-            if(brk.test(txt)) continue;
-            const re = new RegExp(`\\b${esc}\\b`, 'gi');
+            if (brk.test(txt)) continue;
+            const re = new RegExp(`\\b(?:${esc}|${spacedEsc})\\b`, 'gi');
             txt = txt.replace(re, m => `[${m}]`);
         }
         if(txt !== n.nodeValue) n.nodeValue = txt;
@@ -114,6 +116,7 @@ function onMessageRendered(id){
     const mes = ctx.chat?.[id];
     if(!mes || mes.is_user) return;
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
+    autoBracket(el);
     tagElement(el);
     recolorAll();
 }
@@ -291,7 +294,8 @@ const setStrict = flag => {
         muts.forEach(m=>{
             m.addedNodes.forEach(node=>{
                 if(node.nodeType!==1) return;
-                if(!node.classList?.contains('assistant')) return;
+                if(!node.classList?.contains('mes')) return;
+                if(node.getAttribute('is_user')==='true') return;
                 const tgt=node.querySelector('.mes_text')||node;
                 autoBracket(tgt);
                 tagElement(tgt);
