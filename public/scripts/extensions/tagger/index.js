@@ -71,12 +71,15 @@ function setsFromState(){
 function recolorAll(){
     const { inv, scene } = setsFromState();
     document.querySelectorAll('#chat .rpg-item').forEach(sp => {
+        sp.classList.remove('inv','scene','unknown');
         const id = sp.dataset.itemId;
         const inInv = inv.has(id);
         const inScene = scene.has(id);
-        sp.classList.toggle('inv', inInv);
-        sp.classList.toggle('scene', !inInv && inScene);
-        sp.classList.toggle('unknown', !inInv && !inScene);
+        if(!inInv && !inScene){
+            sp.classList.add('unknown');
+            return;
+        }
+        sp.classList.add(inInv ? 'inv' : 'scene');
     });
 }
 
@@ -110,11 +113,12 @@ const setStrict = flag => {
 };
     if(!settings.enabled) return '';
     const tick = () => new Promise(r => requestAnimationFrame(r));
-    const events = { sceneUpdate:0, itemAdd:0, itemRemove:0 };
+    const events = { sceneUpdate:0, itemAdd:0, itemRemove:0, stateReset:0 };
     const handlers = {
         sceneUpdate: () => events.sceneUpdate++,
         itemAdd: () => events.itemAdd++,
         itemRemove: () => events.itemRemove++,
+        stateReset: () => events.stateReset++,
     };
     for(const [ev,fn] of Object.entries(handlers)) window.addEventListener(ev, fn);
 
