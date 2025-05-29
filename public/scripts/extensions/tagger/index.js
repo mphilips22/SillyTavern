@@ -82,7 +82,7 @@ function recolorAll(){
 }
 
 function onMessageRendered(id){
-    const mes = ctx.chat?.[id];
+    const mes = chat[id];
     if(!mes || mes.is_user) return;
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     tagElement(el);
