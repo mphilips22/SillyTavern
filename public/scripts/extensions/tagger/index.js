@@ -186,6 +186,45 @@ async function runSelfTest(){
         );
         step++;
 
+        /* 8 – strict ON blocks unknown */
+        RuleVault.setStrict(true);
+        CoreState.setScene([canon('FakeGem')]);
+        await tick();
+        const fg = document.querySelector('.rpg-item.scene[data-item-id="'+canon('FakeGem')+'"]');
+        assert(!fg, 'FakeGem should be ignored in strict mode');
+        step++;
+
+        /* 9 – strict OFF auto-mints */
+        RuleVault.setStrict(false);
+        CoreState.setScene([canon('FakeGem')]);
+        await tick();
+        const fg2 = document.querySelector('.rpg-item.scene[data-item-id="'+canon('FakeGem')+'"]');
+        assert(fg2 && fg2.classList.contains('scene'), 'FakeGem should appear once loose mode enabled');
+        step++;
+
+        /* 10 – stateReset recolours to unknown */
+        CoreState.clearState();
+        await tick();
+        const allUnknown = [...document.querySelectorAll('.rpg-item')].every(s=>s.classList.contains('unknown'));
+        assert(allUnknown, 'All items should turn unknown after reset');
+        step++;
+
+        /* 11 – canonical match with junk spacing/case */
+        CoreState.setScene([canon('Apple')]);
+        injectAssistant('Night falls over the [ APPLE ] again.');
+        await tick();
+        const weirdApple = document.querySelector('.rpg-item.scene[data-item-id="'+canon('Apple')+'"]');
+        assert(weirdApple, 'Bracketed label with spaces/case maps to Apple');
+        step++;
+
+        /* 12 – no double-wrap on re-run */
+        const beforeCount = document.querySelectorAll('.rpg-item[data-item-id="'+canon('Apple')+'"]').length;
+        injectAssistant('You see another [Apple].');
+        await tick();
+        const after = document.querySelectorAll('.rpg-item[data-item-id="'+canon('Apple')+'"]').length;
+        assert(after === beforeCount + 1, 'Exactly one new span added (no nesting)');
+        step++;
+
         assert(
             fails.length === 0,
             'No test steps should have failed'
@@ -197,8 +236,7 @@ async function runSelfTest(){
         for(const [ev,fn] of Object.entries(handlers)) window.removeEventListener(ev, fn);
     }
 
-    const msg = fails.length ? `failed at step(s) ${fails.join(', ')}` : `${pass} / 7 checks passed ✔️`;
-    assistantBubble(`*Tagger self-test: ${msg}*`);
+    assistantBubble(`*Tagger self-test: ${pass} / 12 checks passed${fails.length ? ' — failed: '+fails.join(', ') : ' ✔️'}*`);
     return '';
 }
 
