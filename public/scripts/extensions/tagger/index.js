@@ -52,7 +52,7 @@ function tagElement(el){
         },
     });
     const nodes = [];
-    for(let n=walker.nextNode(); n; n=walker.nextNode()) nodes.push(n);
+    for(let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
     nodes.forEach(tagTextNode);
 }
 
@@ -88,19 +88,19 @@ function onMessageRendered(id){
     recolorAll();
 }
 
-function injectAssistant(text){
+async function injectAssistant(text){
     const message = { name:'SelfTest', is_user:false, is_system:false, send_date:Date.now(), mes:String(text), extra:{ type: system_message_types.ASSISTANT_MESSAGE } };
     chat.push(message);
     const mid = chat.length - 1;
-    eventSource.emit(event_types.MESSAGE_RECEIVED, mid, 'extension');
+    await eventSource.emit(event_types.MESSAGE_RECEIVED, mid, 'extension');
     addOneMessage(message);
-    eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, mid, 'extension');
+    await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, mid, 'extension');
     ctx.saveChat?.();
     return mid;
 }
 
-function assistantBubble(text){
-    injectAssistant(text);
+async function assistantBubble(text){
+    await injectAssistant(text);
 }
 
 async function runSelfTest(){
@@ -132,7 +132,7 @@ async function runSelfTest(){
         recolorAll();
         assert(
             [...document.querySelectorAll('#chat .rpg-item')].every(sp => sp.classList.contains('unknown')),
-            'Existing items should be tagged unknown after state reset'
+            'Existing items should be tagged unknown after state reset',
         );
         step++;
 
@@ -141,15 +141,15 @@ async function runSelfTest(){
         let d = delta(before);
         assert(
             CoreState.getState().sceneObjects.includes(canon('Apple')) && d.sceneUpdate === 1,
-            'Apple should be in scene and sceneUpdate event fired'
+            'Apple should be in scene and sceneUpdate event fired',
         );
         step++;
 
-        const id1 = injectAssistant('On the table lies [Apple].');
+        const id1 = await injectAssistant('On the table lies [Apple].');
         const sp1 = document.querySelector(`#chat [mesid="${id1}"] .rpg-item`);
         assert(
             sp1 && sp1.classList.contains('scene'),
-            'First apple should be tagged as scene'
+            'First apple should be tagged as scene',
         );
         step++;
 
@@ -159,15 +159,15 @@ async function runSelfTest(){
         recolorAll();
         assert(
             sp1.classList.contains('inv') && d.itemAdd === 1,
-            'Item should move to inventory and itemAdd event fired'
+            'Item should move to inventory and itemAdd event fired',
         );
         step++;
 
-        const id2 = injectAssistant('You stash [apple] safely.');
+        const id2 = await injectAssistant('You stash [apple] safely.');
         const sp2 = document.querySelector(`#chat [mesid="${id2}"] .rpg-item`);
         assert(
             sp2 && sp2.classList.contains('inv'),
-            'Second apple should be tagged as inv'
+            'Second apple should be tagged as inv',
         );
         step++;
 
@@ -179,13 +179,13 @@ async function runSelfTest(){
         const allScene = [sp1, sp2].every(sp => sp.classList.contains('scene'));
         assert(
             allScene && d.sceneUpdate === 1 && d.itemRemove === 1,
-            'Apples should be scene items after removal with events fired'
+            'Apples should be scene items after removal with events fired',
         );
         step++;
 
         assert(
             fails.length === 0,
-            'No test steps should have failed'
+            'No test steps should have failed',
         );
     }catch(err){
         console.error(err);
@@ -195,7 +195,7 @@ async function runSelfTest(){
     }
 
     const msg = fails.length ? `failed at step(s) ${fails.join(', ')}` : `${pass} / 7 checks passed ✔️`;
-    assistantBubble(`*Tagger self-test: ${msg}*`);
+    await assistantBubble(`*Tagger self-test: ${msg}*`);
     return '';
 }
 
