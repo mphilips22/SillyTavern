@@ -18,7 +18,7 @@ function injectCss(){
         const link = document.createElement('link');
         link.id = 'tagger-style';
         link.rel = 'stylesheet';
-        link.href = 'scripts/extensions/features/tagger/tagger.css';
+        link.href = 'scripts/extensions/tagger/tagger.css';
         document.head.appendChild(link);
     }
 }
