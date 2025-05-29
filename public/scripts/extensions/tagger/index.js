@@ -117,35 +117,58 @@ async function runSelfTest(){
     let step = 1; let pass = 0;
     const snap = () => ({ ...events });
     const delta = b => ({ sceneUpdate: events.sceneUpdate - b.sceneUpdate, itemAdd: events.itemAdd - b.itemAdd, itemRemove: events.itemRemove - b.itemRemove });
-    const assert = cond => { console.assert(cond); if(cond) pass++; else fails.push(step); };
+    const assert = (cond, description) => {
+        if (!cond) {
+            console.error(`Tagger self-test step ${step} failed: ${description}`);
+            fails.push(step);
+        } else {
+            pass++;
+        }
+        console.assert(cond, description);
+    };
 
     try{
         CoreState.clearState();
         recolorAll();
-        assert([...document.querySelectorAll('#chat .rpg-item')].every(sp => sp.classList.contains('unknown')));
+        assert(
+            [...document.querySelectorAll('#chat .rpg-item')].every(sp => sp.classList.contains('unknown')),
+            'Existing items should be tagged unknown after state reset'
+        );
         step++;
 
         let before = snap();
         CoreState.setScene([canon('Apple')]);
         let d = delta(before);
-        assert(CoreState.getState().sceneObjects.includes(canon('Apple')) && d.sceneUpdate===1);
+        assert(
+            CoreState.getState().sceneObjects.includes(canon('Apple')) && d.sceneUpdate === 1,
+            'Apple should be in scene and sceneUpdate event fired'
+        );
         step++;
 
         const id1 = injectAssistant('On the table lies [Apple].');
         const sp1 = document.querySelector(`#chat [mesid="${id1}"] .rpg-item`);
-        assert(sp1 && sp1.classList.contains('scene'));
+        assert(
+            sp1 && sp1.classList.contains('scene'),
+            'First apple should be tagged as scene'
+        );
         step++;
 
         before = snap();
         CoreState.addItem(undefined, canon('Apple'));
         d = delta(before);
         recolorAll();
-        assert(sp1.classList.contains('inv') && d.itemAdd===1);
+        assert(
+            sp1.classList.contains('inv') && d.itemAdd === 1,
+            'Item should move to inventory and itemAdd event fired'
+        );
         step++;
 
         const id2 = injectAssistant('You stash [apple] safely.');
         const sp2 = document.querySelector(`#chat [mesid="${id2}"] .rpg-item`);
-        assert(sp2 && sp2.classList.contains('inv'));
+        assert(
+            sp2 && sp2.classList.contains('inv'),
+            'Second apple should be tagged as inv'
+        );
         step++;
 
         before = snap();
@@ -154,10 +177,16 @@ async function runSelfTest(){
         d = delta(before);
         recolorAll();
         const allScene = [sp1, sp2].every(sp => sp.classList.contains('scene'));
-        assert(allScene && d.sceneUpdate===1 && d.itemRemove===1);
+        assert(
+            allScene && d.sceneUpdate === 1 && d.itemRemove === 1,
+            'Apples should be scene items after removal with events fired'
+        );
         step++;
 
-        assert(fails.length===0);
+        assert(
+            fails.length === 0,
+            'No test steps should have failed'
+        );
     }catch(err){
         console.error(err);
         fails.push(step);
