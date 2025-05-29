@@ -388,7 +388,6 @@ function processPacket(cmds){
         assistantBubble(`*Unknown item: ${pending[0].raw}*`);
         return;
     }
-    coreSetScene([...stagedScene]);
     actions.forEach(fn=>fn());
 }
 
