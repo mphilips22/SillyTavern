@@ -104,6 +104,10 @@ function assistantBubble(text){
 }
 
 async function runSelfTest(){
+    // helper – paste near the top of runSelfTest
+const setStrict = flag => {
+  RuleVault.strict = !!flag;          // same field the slash-command toggles
+};
     if(!settings.enabled) return '';
     const tick = () => new Promise(r => requestAnimationFrame(r));
     const events = { sceneUpdate:0, itemAdd:0, itemRemove:0 };
@@ -187,7 +191,7 @@ async function runSelfTest(){
         step++;
 
         /* 8 – strict ON blocks unknown */
-        RuleVault.setStrict(true);
+        setStrict(true);
         CoreState.setScene([canon('FakeGem')]);
         await tick();
         const fg = document.querySelector('.rpg-item.scene[data-item-id="'+canon('FakeGem')+'"]');
@@ -195,7 +199,7 @@ async function runSelfTest(){
         step++;
 
         /* 9 – strict OFF auto-mints */
-        RuleVault.setStrict(false);
+        setStrict(false);
         CoreState.setScene([canon('FakeGem')]);
         await tick();
         const fg2 = document.querySelector('.rpg-item.scene[data-item-id="'+canon('FakeGem')+'"]');
