@@ -320,13 +320,24 @@ function processPacket(cmds){
         if(!stagedInv.has(n)) stagedInv.set(n, new Set());
     };
 
-    for(const cmd of cmds){
+    for(let i = 0; i < cmds.length; i++){
+        const cmd = cmds[i];
         if(!cmd) continue;
         if(cmd.verb  ===  'newItem'){
             if(cmd.args.label){
                 const id = canon(cmd.args.label);
-                stagedScene.add(id);
-                actions.push(()=>addSceneItem(id));
+                const next = cmds[i + 1];
+                if(next && next.verb === 'addItem' && next.args.item && canon(next.args.item) === id){
+                    const target = next.args.target || personaName();
+                    stagedScene.add(id);
+                    stagedScene.delete(id);
+                    ensureInv(target); stagedInv.get(target).add(id);
+                    actions.push(()=>{ coreSetScene(CoreState.getState().sceneObjects); CoreState.addItem(target,id); });
+                    i++; // skip the following addItem
+                } else {
+                    stagedScene.add(id);
+                    actions.push(()=>addSceneItem(id));
+                }
             }
         }else if(cmd.verb  ===  'addItem'){
             if(cmd.args.item){
