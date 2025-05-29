@@ -105,6 +105,7 @@ function assistantBubble(text){
 
 async function runSelfTest(){
     if(!settings.enabled) return '';
+    const tick = () => new Promise(r => requestAnimationFrame(r));
     const events = { sceneUpdate:0, itemAdd:0, itemRemove:0 };
     const handlers = {
         sceneUpdate: () => events.sceneUpdate++,
@@ -146,6 +147,7 @@ async function runSelfTest(){
         step++;
 
         const id1 = injectAssistant('On the table lies [Apple].');
+        await tick(); // lets Tagger wrap and recolour before assertions run
         const sp1 = document.querySelector(`#chat [mesid="${id1}"] .rpg-item`);
         assert(
             sp1 && sp1.classList.contains('scene'),
@@ -164,6 +166,7 @@ async function runSelfTest(){
         step++;
 
         const id2 = injectAssistant('You stash [apple] safely.');
+        await tick(); // lets Tagger wrap and recolour before assertions run
         const sp2 = document.querySelector(`#chat [mesid="${id2}"] .rpg-item`);
         assert(
             sp2 && sp2.classList.contains('inv'),
