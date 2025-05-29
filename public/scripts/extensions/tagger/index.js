@@ -68,6 +68,33 @@ function setsFromState(){
     return { inv, scene };
 }
 
+function autoBracket(el){
+    if(!el) return;
+    const state = CoreState.getState();
+    const player = state.characters?.[CoreState.playerName] || {};
+    const labels = [...new Set([...(state.sceneObjects||[]), ...(player.inventory||[])])]
+        .filter(Boolean)
+        .sort((a,b)=>b.length-a.length);
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+        acceptNode(node){
+            if(!node.nodeValue) return NodeFilter.FILTER_REJECT;
+            if(node.parentElement.closest('.rpg-item, code, pre')) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+        },
+    });
+    for(let n=walker.nextNode(); n; n=walker.nextNode()){
+        let txt = n.nodeValue;
+        for(const label of labels){
+            const esc = label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+            const brk = new RegExp(`\\[\\s*${esc}\\s*\\]`, 'i');
+            if(brk.test(txt)) continue;
+            const re = new RegExp(`\\b${esc}\\b`, 'gi');
+            txt = txt.replace(re, m => `[${m}]`);
+        }
+        if(txt !== n.nodeValue) n.nodeValue = txt;
+    }
+}
+
 function recolorAll(){
     const { inv, scene } = setsFromState();
     document.querySelectorAll('#chat .rpg-item').forEach(sp => {
@@ -260,6 +287,18 @@ const setStrict = flag => {
     window.addEventListener('itemAdd', recolorAll);
     window.addEventListener('itemRemove', recolorAll);
     window.addEventListener('stateReset', recolorAll);
+    new MutationObserver(muts=>{
+        muts.forEach(m=>{
+            m.addedNodes.forEach(node=>{
+                if(node.nodeType!==1) return;
+                if(!node.classList?.contains('assistant')) return;
+                const tgt=node.querySelector('.mes_text')||node;
+                autoBracket(tgt);
+                tagElement(tgt);
+                recolorAll();
+            });
+        });
+    }).observe(document.body,{childList:true,subtree:true});
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name:'tagger-selftest',
         callback: runSelfTest,
