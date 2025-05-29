@@ -105,6 +105,14 @@ function assistantBubble(text){
 
 async function runSelfTest(){
     if(!settings.enabled) return '';
+    async function waitForSelector(sel, timeout = 1000) {
+        const start = Date.now();
+        while (!document.querySelector(sel)) {
+            if (Date.now() - start > timeout) return null;
+            await new Promise(r => setTimeout(r, 16));
+        }
+        return document.querySelector(sel);
+    }
     const events = { sceneUpdate:0, itemAdd:0, itemRemove:0 };
     const handlers = {
         sceneUpdate: () => events.sceneUpdate++,
@@ -139,7 +147,7 @@ async function runSelfTest(){
 
         const id1 = await injectAssistant('On the table lies [Apple].');
         await new Promise(r => requestAnimationFrame(r));
-        const sp1 = document.querySelector(`#chat [mesid="${id1}"] .rpg-item`);
+        const sp1 = await waitForSelector(`#chat [mesid="${id1}"] .rpg-item`);
         assert(sp1 && sp1.classList.contains('scene'), { span: sp1 });
 
         before = snap();
@@ -150,7 +158,7 @@ async function runSelfTest(){
 
         const id2 = await injectAssistant('You stash [apple] safely.');
         await new Promise(r => requestAnimationFrame(r));
-        const sp2 = document.querySelector(`#chat [mesid="${id2}"] .rpg-item`);
+        const sp2 = await waitForSelector(`#chat [mesid="${id2}"] .rpg-item`);
         assert(sp2 && sp2.classList.contains('inv'), { span: sp2 });
 
         before = snap();
