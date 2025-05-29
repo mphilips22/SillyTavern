@@ -114,39 +114,44 @@ async function runSelfTest(){
     for(const [ev,fn] of Object.entries(handlers)) window.addEventListener(ev, fn);
 
     const fails = [];
-    let step = 1; let pass = 0;
+    let step = 0; let pass = 0;
     const snap = () => ({ ...events });
     const delta = b => ({ sceneUpdate: events.sceneUpdate - b.sceneUpdate, itemAdd: events.itemAdd - b.itemAdd, itemRemove: events.itemRemove - b.itemRemove });
-    const assert = cond => { console.assert(cond); if(cond) pass++; else fails.push(step); };
+    const assert = (ok, dbg = {}) => {
+        step++;
+        if(ok){
+            pass++;
+            return;
+        }
+        console.error(`❌ Tagger self-test step ${step} failed`, dbg);
+        fails.push(step);
+    };
 
     try{
         CoreState.clearState();
         recolorAll();
         assert([...document.querySelectorAll('#chat .rpg-item')].every(sp => sp.classList.contains('unknown')));
-        step++;
 
         let before = snap();
         CoreState.setScene([canon('Apple')]);
         let d = delta(before);
         assert(CoreState.getState().sceneObjects.includes(canon('Apple')) && d.sceneUpdate === 1);
-        step++;
 
         const id1 = await injectAssistant('On the table lies [Apple].');
+        await new Promise(r => requestAnimationFrame(r));
         const sp1 = document.querySelector(`#chat [mesid="${id1}"] .rpg-item`);
-        assert(sp1 && sp1.classList.contains('scene'));
-        step++;
+        assert(sp1 && sp1.classList.contains('scene'), { span: sp1 });
 
         before = snap();
         CoreState.addItem(undefined, canon('Apple'));
         d = delta(before);
         recolorAll();
-        assert(sp1.classList.contains('inv') && d.itemAdd === 1);
-        step++;
+        assert(sp1.classList.contains('inv') && d.itemAdd === 1, { span: sp1, events:d });
 
         const id2 = await injectAssistant('You stash [apple] safely.');
+        await new Promise(r => requestAnimationFrame(r));
         const sp2 = document.querySelector(`#chat [mesid="${id2}"] .rpg-item`);
-        assert(sp2 && sp2.classList.contains('inv'));
-        step++;
+        assert(sp2 && sp2.classList.contains('inv'), { span: sp2 });
 
         before = snap();
         CoreState.removeItem(undefined, canon('Apple'));
@@ -154,8 +159,7 @@ async function runSelfTest(){
         d = delta(before);
         recolorAll();
         const allScene = [sp1, sp2].every(sp => sp.classList.contains('scene'));
-        assert(allScene && d.sceneUpdate === 1 && d.itemRemove === 1);
-        step++;
+        assert(allScene && d.sceneUpdate === 1 && d.itemRemove === 1, { events:d });
 
         assert(fails.length === 0);
     }catch(err){
@@ -165,8 +169,10 @@ async function runSelfTest(){
         for(const [ev,fn] of Object.entries(handlers)) window.removeEventListener(ev, fn);
     }
 
-    const msg = fails.length ? `failed at step(s) ${fails.join(', ')}` : `${pass} / 7 checks passed ✔️`;
-    assistantBubble(`*Tagger self-test: ${msg}*`);
+    const summary = fails.length
+        ? `*Tagger self-test: failed steps ${fails.join(', ')} ❌*`
+        : `*Tagger self-test: ${pass} / 7 checks passed ✔️*`;
+    assistantBubble(summary);
     return '';
 }
 
