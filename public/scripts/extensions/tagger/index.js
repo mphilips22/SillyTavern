@@ -71,6 +71,7 @@ function setsFromState(){
 function recolorAll(){
     const { inv, scene } = setsFromState();
     document.querySelectorAll('#chat .rpg-item').forEach(sp => {
+        sp.classList.remove('scene','inv','unknown');
         const id = sp.dataset.itemId;
         const inInv = inv.has(id);
         const inScene = scene.has(id);
