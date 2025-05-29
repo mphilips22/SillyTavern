@@ -310,22 +310,30 @@ function processPacket(cmds){
     for(const [name, ch] of Object.entries(state.characters || {})){
         inv[name] = new Set((ch.inventory || []).map(canon));
     }
-    const ensureInv = (n)=>{ inv[n] = inv[n] || new Set(); };
+
+    let stagedScene = new Set(scene);
+    let stagedInv = new Map();
+    for(const [name, set] of Object.entries(inv)){
+        stagedInv.set(name, new Set([...set]));
+    }
+    const ensureInv = (n)=>{
+        if(!stagedInv.has(n)) stagedInv.set(n, new Set());
+    };
 
     for(const cmd of cmds){
         if(!cmd) continue;
         if(cmd.verb  ===  'newItem'){
             if(cmd.args.label){
                 const id = canon(cmd.args.label);
-                scene.add(id);
+                stagedScene.add(id);
                 actions.push(()=>addSceneItem(id));
             }
         }else if(cmd.verb  ===  'addItem'){
             if(cmd.args.item){
                 const id = canon(cmd.args.item);
                 const target = cmd.args.target || personaName();
-                if(!scene.delete(id)) pending.push({ id, raw: cmd.args.item });
-                ensureInv(target); inv[target].add(id);
+                if(!stagedScene.delete(id)) pending.push({ id, raw: cmd.args.item });
+                ensureInv(target); stagedInv.get(target).add(id);
                 actions.push(()=>{ removeSceneItem(id); CoreState.addItem(target,id); });
             }
         }else if(cmd.verb  ===  'moveItem'){
@@ -333,8 +341,8 @@ function processPacket(cmds){
                 const id = canon(cmd.args.item);
                 const src = cmd.args.from || personaName();
                 const dst = cmd.args.to || personaName();
-                const sset = src.toLowerCase()  ===  'scene' ? scene : (ensureInv(src), inv[src]);
-                const dset = dst.toLowerCase()  ===  'scene' ? scene : (ensureInv(dst), inv[dst]);
+                const sset = src.toLowerCase()  ===  'scene' ? stagedScene : (ensureInv(src), stagedInv.get(src));
+                const dset = dst.toLowerCase()  ===  'scene' ? stagedScene : (ensureInv(dst), stagedInv.get(dst));
                 if(!sset.delete(id)) pending.push({ id, raw: cmd.args.item });
                 dset.add(id);
                 actions.push(()=>{
@@ -345,40 +353,42 @@ function processPacket(cmds){
         }else{
             actions.push(()=>handleCommand(cmd));
             if(cmd.verb  ===  'setScene'){
-                scene.clear();
-                for(const it of parseItems(cmd.args.items)) scene.add(canon(it));
+                stagedScene.clear();
+                for(const it of parseItems(cmd.args.items)) stagedScene.add(canon(it));
             }else if(cmd.verb  ===  'removeItem'){
                 if(cmd.args.item){
                     const target = cmd.args.target || personaName();
                     const id = canon(cmd.args.item);
-                    if (target.toLowerCase()  ===  'scene') scene.delete(id); else { ensureInv(target); inv[target].delete(id); }
+                    if (target.toLowerCase()  ===  'scene') stagedScene.delete(id); else { ensureInv(target); stagedInv.get(target).delete(id); }
                 }
             }else if(cmd.verb  ===  'consumeItem'){
                 if(cmd.args.item){
                     const target = cmd.args.target || personaName();
                     const id = canon(cmd.args.item);
-                    if (target.toLowerCase()  ===  'scene') scene.delete(id); else {
-                        ensureInv(target); if (!inv[target].delete(id)) scene.delete(id);
+                    if (target.toLowerCase()  ===  'scene') stagedScene.delete(id); else {
+                        ensureInv(target); if (!stagedInv.get(target).delete(id)) stagedScene.delete(id);
                     }
                 }
             }else if(cmd.verb  ===  'dropItem'){
                 if(cmd.args.item){
                     const target = cmd.args.target || personaName();
                     const id = canon(cmd.args.item);
-                    ensureInv(target); inv[target].delete(id); scene.add(id);
+                    ensureInv(target); stagedInv.get(target).delete(id); stagedScene.add(id);
                 }
             }else if(cmd.verb  ===  'clearScene'){
-                scene.clear();
+                stagedScene.clear();
             }else if(cmd.verb  ===  'clearInv'){
                 const target = cmd.args.target || personaName();
-                ensureInv(target); inv[target].clear();
+                ensureInv(target); stagedInv.get(target).clear();
             }
         }
     }
+    console.log('[RV] STRICT', STRICT, 'pending', pending);
     if (STRICT && pending.length){
         assistantBubble(`*Unknown item: ${pending[0].raw}*`);
         return;
     }
+    coreSetScene([...stagedScene]);
     actions.forEach(fn=>fn());
 }
 
