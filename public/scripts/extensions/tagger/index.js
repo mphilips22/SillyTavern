@@ -194,20 +194,22 @@ const setStrict = flag => {
         );
         step++;
 
-        /* 8 – strict ON blocks unknown */
+        /* 8 – strict ON: unknown item should stay .unknown */
         setStrict(true);
-        CoreState.setScene([canon('FakeGem')]);
+        CoreState.setScene([]);                         // clear scene
+        const fgId1 = injectAssistant('You notice [FakeGem] on a shelf.');
         await tick();
-        const fg = document.querySelector('.rpg-item.scene[data-item-id="'+canon('FakeGem')+'"]');
-        assert(!fg, 'FakeGem should be ignored in strict mode');
+        const fgStrict = document.querySelector(`#chat [mesid="${fgId1}"] .rpg-item[data-item-id="${canon('FakeGem')}"]`);
+        assert(fgStrict && fgStrict.classList.contains('unknown'), 'FakeGem should be unknown in strict mode');
         step++;
 
-        /* 9 – strict OFF auto-mints */
+        /* 9 – strict OFF: same item auto-mints to .scene */
         setStrict(false);
         CoreState.setScene([canon('FakeGem')]);
+        const fgId2 = injectAssistant('The [FakeGem] glitters faintly.');
         await tick();
-        const fg2 = document.querySelector('.rpg-item.scene[data-item-id="'+canon('FakeGem')+'"]');
-        assert(fg2 && fg2.classList.contains('scene'), 'FakeGem should appear once loose mode enabled');
+        const fgLoose = document.querySelector(`#chat [mesid="${fgId2}"] .rpg-item.scene[data-item-id="${canon('FakeGem')}"]`);
+        assert(fgLoose, 'FakeGem should be coloured scene once strict is off');
         step++;
 
         /* 10 – stateReset recolours to unknown */
