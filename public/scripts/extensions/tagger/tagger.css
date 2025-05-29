@@ -1,6 +1,4 @@
-.rpg-item.scene { color:#B0BEC5; }
-.rpg-item.inv { color:#5AFF5A; }
-.type-weapon { color:#FFA64C; }
-.type-consumable { color:#7CF96A; }
-.type-quest { color:#FFD700; font-weight:bold; }
-.type-misc { color:#CCCCCC; }
+.rpg-item { font-weight:600; cursor:help; white-space:nowrap; }
+.rpg-item.inv    { color:#8f8; }
+.rpg-item.scene  { color:#bbb; }
+.rpg-item.unknown{ color:#f88; }
