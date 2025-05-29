@@ -1,173 +1,199 @@
+import { chat, addOneMessage, eventSource, event_types, system_message_types } from '../../../script.js';
 import * as CoreState from '../core-state/index.js';
-import { eventSource, event_types } from '../../../script.js';
+import { SlashCommand } from '../../slash-commands/SlashCommand.js';
+import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 
-// Resolve the player name from the current context at load time
-/** @type {any} */
-const ctx = SillyTavern?.getContext?.() ?? {};
-const PLAYER = ctx.character?.name || ctx.persona?.name || 'Player';
+const ctx = globalThis.SillyTavern?.getContext?.() ?? {};
+ctx.extensionSettings ??= {};
+ctx.extensionSettings.features ??= {};
+ctx.extensionSettings.features.tagger ??= { enabled: true };
+const settings = ctx.extensionSettings.features.tagger;
 
-console.log('[Tagger] extension loaded');
-
-const sceneSet = new Set();
-const invSet = new Set();
-
-function labelFor(id) {
-    const rules = window.RuleVault?.getRules?.();
-    const staticMeta = rules?.items?.[id];
-    const meta = window.RuleVault?.getItemMeta?.(id) || staticMeta;
-    return meta?.label || id;
+function canon(label){
+    return window.RuleVault?.canon?.(label) ?? String(label || '').toLowerCase().replace(/[^a-z0-9]/g,'');
 }
 
-function typeFor(id) {
-    const rules = window.RuleVault?.getRules?.();
-    const staticMeta = rules?.items?.[id];
-    const meta = window.RuleVault?.getItemMeta?.(id) || staticMeta;
-    return meta?.type || 'misc';
-}
-
-function rebuildFromState() {
-    if (!window.CoreState) return;
-    const root   = CoreState.getState();
-    const player = root.characters?.[PLAYER] || {};
-
-    invSet.clear();
-    (player.inventory || []).forEach(i => invSet.add(i));
-
-    sceneSet.clear();
-    (root.sceneObjects || []).forEach(i => sceneSet.add(i));
-}
-
-function recolor(id) {
-    const locClass = invSet.has(id) ? 'inv' : 'scene';
-    const typeClass = `type-${typeFor(id)}`;
-    document.querySelectorAll(`.rpg-item[data-item-id="${id}"]`).forEach(sp => {
-        sp.classList.toggle('inv', locClass === 'inv');
-        sp.classList.toggle('scene', locClass === 'scene');
-        sp.classList.forEach(c => { if (c.startsWith('type-')) sp.classList.remove(c); });
-        sp.classList.add(typeClass);
-    });
-}
-
-function handleSceneUpdate(e) {
-    if (!e?.detail?.items) return;
-    sceneSet.clear();
-    e.detail.items.forEach(it => {
-        sceneSet.add(it);
-        recolor(it);
-    });
-    highlightAll();
-}
-
-function handleItemAdd(e) {
-    if (e?.detail?.item) {
-        invSet.add(e.detail.item);
-        sceneSet.delete(e.detail.item);
-        recolor(e.detail.item);
-        highlightAll();
+function injectCss(){
+    if(!document.getElementById('tagger-style')){
+        const link = document.createElement('link');
+        link.id = 'tagger-style';
+        link.rel = 'stylesheet';
+        link.href = 'scripts/extensions/features/tagger/tagger.css';
+        document.head.appendChild(link);
     }
 }
 
-function handleItemRemove(e) {
-    if (e?.detail?.item) {
-        invSet.delete(e.detail.item);
-        recolor(e.detail.item);
-        highlightAll();
+function tagTextNode(node){
+    const text = node.nodeValue;
+    const re = /\[([^\]]+)\]/g;
+    let last = 0;
+    const frag = document.createDocumentFragment();
+    let m;
+    while((m = re.exec(text))){
+        frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+        const span = document.createElement('span');
+        span.className = 'rpg-item scene';
+        span.dataset.itemId = canon(m[1]);
+        span.textContent = m[1];
+        frag.appendChild(span);
+        last = re.lastIndex;
     }
+    frag.appendChild(document.createTextNode(text.slice(last)));
+    node.replaceWith(frag);
 }
 
-function handleStateReset() {
-    rebuildFromState();
-    highlightAll();
-}
-
-function getItems() {
-    const ids = new Set([...sceneSet, ...invSet]);
-    const arr = [...ids].map(id => ({
-        id,
-        label: labelFor(id),
-        type: typeFor(id),
-        location: invSet.has(id) ? 'inv' : 'scene',
-    }));
-    return arr.sort((a,b) => b.label.length - a.label.length);
-}
-
-// Escape characters that have special meaning in regular expressions
-// Adapted from the standard escape implementation recommended by MDN
-const escapeRE = (str) =>
-    str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-function highlight(element) {
-    if (!element) return;
-    const items = getItems();
-    if (!items.length) return;
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
-        acceptNode(node) {
-            if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-            const p = node.parentElement;
-            if (p && p.closest('code, pre, .rpg-item')) return NodeFilter.FILTER_REJECT;
+function tagElement(el){
+    if(!el) return;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+        acceptNode(node){
+            if(!node.nodeValue || !node.nodeValue.includes('[')) return NodeFilter.FILTER_REJECT;
+            if(node.parentElement.closest('.rpg-item, code, pre')) return NodeFilter.FILTER_REJECT;
             return NodeFilter.FILTER_ACCEPT;
         },
     });
     const nodes = [];
     for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
-    nodes.forEach(node => {
-        let html = node.nodeValue;
-        items.forEach(it => {
-            const re = new RegExp(`\\b${escapeRE(it.label)}\\b`, 'gi');
-            html = html.replace(re, `<span class="rpg-item ${it.location} type-${it.type}" data-item-id="${it.id}">$&</span>`);
-        });
-        if (html !== node.nodeValue) {
-            const tmp = document.createElement('span');
-            tmp.innerHTML = html;
-            node.replaceWith(...tmp.childNodes);
-        }
+    nodes.forEach(tagTextNode);
+}
+
+function highlightAll(){
+    document.querySelectorAll('#chat .mes_text').forEach(tagElement);
+}
+
+function setsFromState(){
+    const state = CoreState.getState();
+    const player = state.characters?.[CoreState.playerName] || {};
+    const inv = new Set((player.inventory || []).map(canon));
+    const scene = new Set((state.sceneObjects || []).map(canon));
+    return { inv, scene };
+}
+
+function recolorAll(){
+    const { inv, scene } = setsFromState();
+    document.querySelectorAll('#chat .rpg-item').forEach(sp => {
+        const id = sp.dataset.itemId;
+        const inInv = inv.has(id);
+        const inScene = scene.has(id);
+        sp.classList.toggle('inv', inInv);
+        sp.classList.toggle('scene', !inInv && inScene);
+        sp.classList.toggle('unknown', !inInv && !inScene);
     });
 }
 
-function highlightAll() {
-    document.querySelectorAll('#chat .mes_text').forEach(el => highlight(el));
-}
-
-function onMessageRendered(id) {
+function onMessageRendered(id){
+    const mes = ctx.chat?.[id];
+    if(!mes || mes.is_user) return;
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
-    if (el) highlight(el);
+    tagElement(el);
+    recolorAll();
 }
 
-function injectCss() {
-    if (!document.getElementById('tagger-style')) {
-        const link = document.createElement('link');
-        link.id = 'tagger-style';
-        link.rel = 'stylesheet';
-        link.href = 'scripts/extensions/tagger/tagger.css';
-        document.head.appendChild(link);
-    }
+async function injectAssistant(text){
+    const message = { name:'SelfTest', is_user:false, is_system:false, send_date:Date.now(), mes:String(text), extra:{ type: system_message_types.ASSISTANT_MESSAGE } };
+    chat.push(message);
+    const mid = chat.length - 1;
+    await eventSource.emit(event_types.MESSAGE_RECEIVED, mid, 'extension');
+    addOneMessage(message);
+    await eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, mid, 'extension');
+    if (ctx.saveChat) await ctx.saveChat();
+    return mid;
 }
 
-function init() {
-    injectCss();
-    rebuildFromState();
-    highlightAll();
-    window.addEventListener('sceneUpdate', handleSceneUpdate);
-    window.addEventListener('itemAdd', handleItemAdd);
-    window.addEventListener('itemRemove', handleItemRemove);
-    window.addEventListener('stateReset', handleStateReset);
-    eventSource.on(event_types.USER_MESSAGE_RENDERED, onMessageRendered);
-    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, onMessageRendered);
-    window.Tagger = {
-        getCurrentSceneLabels: () => [...sceneSet].map(labelFor),
-        highlight,
+function assistantBubble(text){
+    injectAssistant(text);
+}
+
+async function runSelfTest(){
+    if(!settings.enabled) return '';
+    const events = { sceneUpdate:0, itemAdd:0, itemRemove:0 };
+    const handlers = {
+        sceneUpdate: () => events.sceneUpdate++,
+        itemAdd: () => events.itemAdd++,
+        itemRemove: () => events.itemRemove++,
     };
+    for(const [ev,fn] of Object.entries(handlers)) window.addEventListener(ev, fn);
+
+    const fails = [];
+    let step = 1; let pass = 0;
+    const snap = () => ({ ...events });
+    const delta = b => ({ sceneUpdate: events.sceneUpdate - b.sceneUpdate, itemAdd: events.itemAdd - b.itemAdd, itemRemove: events.itemRemove - b.itemRemove });
+    const assert = cond => { console.assert(cond); if(cond) pass++; else fails.push(step); };
+
+    try{
+        CoreState.clearState();
+        recolorAll();
+        assert([...document.querySelectorAll('#chat .rpg-item')].every(sp => sp.classList.contains('unknown')));
+        step++;
+
+        let before = snap();
+        CoreState.setScene([canon('Apple')]);
+        let d = delta(before);
+        assert(CoreState.getState().sceneObjects.includes(canon('Apple')) && d.sceneUpdate === 1);
+        step++;
+
+        const id1 = await injectAssistant('On the table lies [Apple].');
+        await new Promise(r => requestAnimationFrame(r));
+        const sp1 = document.querySelector(`#chat [mesid="${id1}"] .rpg-item`);
+        assert(sp1 && sp1.classList.contains('scene'));
+        step++;
+
+        before = snap();
+        CoreState.addItem(undefined, canon('Apple'));
+        d = delta(before);
+        recolorAll();
+        assert(sp1.classList.contains('inv') && d.itemAdd === 1);
+        step++;
+
+        const id2 = await injectAssistant('You stash [apple] safely.');
+        await new Promise(r => requestAnimationFrame(r));
+        const sp2 = document.querySelector(`#chat [mesid="${id2}"] .rpg-item`);
+        assert(sp2 && sp2.classList.contains('inv'));
+        step++;
+
+        before = snap();
+        CoreState.removeItem(undefined, canon('Apple'));
+        CoreState.setScene([canon('Apple')]);
+        d = delta(before);
+        recolorAll();
+        const allScene = [sp1, sp2].every(sp => sp.classList.contains('scene'));
+        assert(allScene && d.sceneUpdate === 1 && d.itemRemove === 1);
+        step++;
+
+        assert(fails.length === 0);
+    }catch(err){
+        console.error(err);
+        fails.push(step);
+    }finally{
+        for(const [ev,fn] of Object.entries(handlers)) window.removeEventListener(ev, fn);
+    }
+
+    const msg = fails.length ? `failed at step(s) ${fails.join(', ')}` : `${pass} / 7 checks passed ✔️`;
+    assistantBubble(`*Tagger self-test: ${msg}*`);
+    return '';
 }
 
-if (document.readyState !== 'loading') {
-    init();
-} else {
-    document.addEventListener('DOMContentLoaded', init, { once: true });
-}
+(function init(){
+    if(!settings.enabled) return;
+    injectCss();
+    highlightAll();
+    recolorAll();
+    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, onMessageRendered);
+    window.addEventListener('sceneUpdate', recolorAll);
+    window.addEventListener('itemAdd', recolorAll);
+    window.addEventListener('itemRemove', recolorAll);
+    window.addEventListener('stateReset', recolorAll);
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name:'tagger-selftest',
+        callback: runSelfTest,
+        helpString:'Run the Tagger self-test.',
+    }));
+})();
 
-/* Dev test (paste in console):
+export {};
+
+/* Dev smoke test (manual)
 CoreState.clearState();
-CoreState.setSceneObjects(["RustyShortsword","BreadLoaf"]);
-addGM("You see a Rusty Shortsword and a bread loaf.");
-CoreState.addItem(undefined,"RustyShortsword"); // sword span should turn green
+CoreState.setScene(['Torch']);
+SillyTavern.injectAssistant('There is a [Torch] here.');
+// => span .scene then run CoreState.modHP etc...
 */
