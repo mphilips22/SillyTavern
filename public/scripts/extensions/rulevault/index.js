@@ -332,7 +332,9 @@ function processPacket(cmds){
             if(cmd.args.item){
                 const id = canon(cmd.args.item);
                 const target = cmd.args.target || personaName();
-                if(!stagedScene.delete(id)) pending.push({ id, raw: cmd.args.item });
+                const found = stagedScene.has(id);
+                if(!found) pending.push({ id, raw: cmd.args.item });
+                stagedScene.delete(id);
                 ensureInv(target); stagedInv.get(target).add(id);
                 actions.push(()=>{ removeSceneItem(id); CoreState.addItem(target,id); });
             }
