@@ -320,6 +320,7 @@ function processPacket(cmds){
         if(!stagedInv.has(n)) stagedInv.set(n, new Set());
     };
 
+    const skipHandle = new Set(['setScene','removeItem','consumeItem','dropItem','clearScene','clearInv']);
     for(const cmd of cmds){
         if(!cmd) continue;
         if(cmd.verb  ===  'newItem'){
@@ -351,7 +352,7 @@ function processPacket(cmds){
                 });
             }
         }else{
-            actions.push(()=>handleCommand(cmd));
+            if(!skipHandle.has(cmd.verb)) actions.push(()=>handleCommand(cmd));
             if(cmd.verb  ===  'setScene'){
                 stagedScene.clear();
                 for(const it of parseItems(cmd.args.items)) stagedScene.add(canon(it));
