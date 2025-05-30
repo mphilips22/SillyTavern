@@ -300,9 +300,11 @@ const setStrict = flag => {
                 if(!node.classList?.contains('mes')) return;
                 if(node.getAttribute('is_user')==='true') return;
                 const tgt=node.querySelector('.mes_text')||node;
-                autoBracket(tgt);
-                tagElement(tgt);
-                recolorAll();
+                setTimeout(() => {
+                    autoBracket(tgt);
+                    tagElement(tgt);
+                    recolorAll();
+                }, 0);
             });
         });
     }).observe(document.body,{childList:true,subtree:true});
