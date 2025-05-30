@@ -57,7 +57,10 @@ function tagElement(el){
 }
 
 function highlightAll(){
-    document.querySelectorAll('#chat .mes_text').forEach(tagElement);
+    document.querySelectorAll('#chat .mes_text').forEach(el => {
+        autoBracket(el);
+        tagElement(el);
+    });
 }
 
 function setsFromState(){
