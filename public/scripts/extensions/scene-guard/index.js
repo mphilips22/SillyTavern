@@ -3,6 +3,20 @@ import { SlashCommand } from '../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 import * as CoreState from '../core-state/index.js';
 
+const inject = window.SillyTavern?.injectAssistant
+            || window.ST?.injectAssistant
+            || ((html, opts = {}) => {
+                 // ultra-light fallback: push straight into chat[]
+                 const chat = (window.SillyTavern?.getContext?.() || {}).chat || window.chat;
+                 if (!Array.isArray(chat)) return;
+                 chat.push({
+                   role: 'assistant',
+                   name: opts.name || 'SelfTest',
+                   text: html,
+                   isAssistant: true,
+                 });
+               });
+
 (function(){
     const ctx = globalThis.SillyTavern?.getContext?.() ?? {};
     ctx.extensionSettings ??= {};
@@ -184,8 +198,9 @@ import * as CoreState from '../core-state/index.js';
         };
 
         const sendTurn = (hidden, visible) => {
-            SillyTavern.injectAssistant(
-                `<div style="display:none">${hidden}</div>${visible}`
+            inject(
+                `<div style="display:none">${hidden}</div>${visible}`,
+                { name: 'SelfTest', italic: true }
             );
         };
 
@@ -197,11 +212,11 @@ import * as CoreState from '../core-state/index.js';
         await tick();
         assert(!document.querySelector('.sceneguard-warn'), 2);
 
-        SillyTavern.injectAssistant('The corridor is dusty.');
+        inject('The corridor is dusty.', { name: 'SelfTest', italic: true });
         await tick();
         assert(!document.querySelector('.sceneguard-warn'), 3);
 
-        SillyTavern.injectAssistant('A rat scurries past.');
+        inject('A rat scurries past.', { name: 'SelfTest', italic: true });
         await tick();
         assert(document.querySelectorAll('.sceneguard-warn').length === 1, 4);
 
@@ -212,7 +227,7 @@ import * as CoreState from '../core-state/index.js';
         const text = fails.length
             ? `*SceneGuard self-test failed: ${fails.join(',')} ❌*`
             : `*SceneGuard self-test: ${pass} / 5 checks passed ✔️*`;
-        SillyTavern.injectAssistant(text, { name: 'SelfTest', italic: true });
+        inject(text, { name: 'SelfTest', italic: true });
         return '';
     }
 
