@@ -35,7 +35,7 @@ const inject = window.SillyTavern?.injectAssistant
     ctx.extensionSettings.features.sceneguard ??= { enabled: true };
     const settings = ctx.extensionSettings.features.sceneguard;
     let lastHadScene = true;
-    let warnCount = 0;
+    let missCount = 0;
     let errorNode = null;
 
     function canon(id){
@@ -138,62 +138,20 @@ const inject = window.SillyTavern?.injectAssistant
             foundScene = true;
         }
         msg.__sceneGuardError = null;
-        if(foundScene && missing.length){
-            warnCount = 0;
-            msg.__sceneGuardError = `⚠ Missing brackets for: ${missing.join(', ')}`;
-            removeHiddenLines(msg);
-        }else if(!foundScene){
-            if(warnCount >= 2 && !document.querySelector('.sceneguard-warn')){
+        const isValid = foundScene && missing.length === 0;
+        if(isValid){
+            missCount = 0;
+            removeWarn();
+        }else{
+            missCount++;
+            if(foundScene && missing.length){
+                msg.__sceneGuardError = `⚠ Missing brackets for: ${missing.join(', ')}`;
+                removeHiddenLines(msg);
+            }else if(missCount >= 2){
                 msg.__sceneGuardError = '⚠ Scene list stale — resend with setScene.';
                 removeHiddenLines(msg);
             }
-        }else{
-            warnCount = 0;
-        }
-        if(msg.__sceneGuardError) showWarn(id, msg.__sceneGuardError); else removeWarn();
-        lastHadScene = foundScene;
-    }
-
-    function onMessage(id){
-        const msg = ctx.chat?.[id];
-        if(!msg || msg.is_user || msg.is_system) return;
-        const raw = msg.mes_html ? stripHtml(msg.mes_html) : msg.mes || '';
-        const lines = String(raw).split(/\r?\n/);
-        let hidden = null;
-        for(let i=lines.length-1;i>=0;i--){
-            const l = lines[i].trim();
-            if(l.startsWith('::')){ hidden = l; break; }
-        }
-        let foundScene = false;
-        let missing = [];
-        if(hidden){
-            const cmds = parseCommands(hidden);
-            const scene = cmds.find(c=>c.verb==='setScene');
-            if(scene){
-                foundScene = true;
-                const items = parseItems(scene.args.items);
-                const textPart = lines.filter(l => l.trim()!==hidden.trim()).join('\n');
-                const search = stripHtml(textPart);
-                for(const it of items){
-                    const esc = it.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-                    const re = new RegExp(`\\[\\s*${esc}\\s*\\]`,`i`);
-                    if(!re.test(search)) missing.push(it);
-                }
-            }
-        }
-        msg.__sceneGuardError = null;
-        if(foundScene && missing.length){
-            warnCount = 0;
-            msg.__sceneGuardError = `⚠ Missing brackets for: ${missing.join(', ')}`;
-            removeHiddenLines(msg);
-        }else if(!foundScene){
-            warnCount++;
-            if(warnCount >= 2){
-                msg.__sceneGuardError = '⚠ Scene list stale — resend with setScene.';
-                removeHiddenLines(msg);
-            }
-        }else{
-            warnCount = 0;
+            if(msg.__sceneGuardError) showWarn(id, msg.__sceneGuardError); else removeWarn();
         }
         lastHadScene = foundScene;
     }
@@ -253,9 +211,9 @@ const inject = window.SillyTavern?.injectAssistant
     }
 
     function init(){
-        eventSource.makeFirst(event_types.MESSAGE_RECEIVED, onMessage);
         eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, onRendered);
         const chatBox = document.getElementById('chat');
+        window.addEventListener('stateReset', () => { missCount = 0; removeWarn(); });
         if(chatBox){
             new MutationObserver(muts => {
                 muts.forEach(m => {
