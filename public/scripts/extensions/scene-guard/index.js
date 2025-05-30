@@ -154,11 +154,6 @@ function showWarn(id, text){
         lastHadScene = foundScene;
     }
 
-    function onRendered(id){
-        const msg = ctx.chat?.[id];
-        if(!msg || msg.is_user || msg.is_system) return;
-        removeWarn();
-    }
 
     async function runSelfTest(){
         if(!settings.enabled) return '';
@@ -210,7 +205,6 @@ missCount = 0;  // start the streak from scratch
     }
 
     function init(){
-        eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, onRendered);
         const chatBox = document.getElementById('chat');
         window.addEventListener('stateReset', () => { missCount = 0; removeWarn(); });
         if(chatBox){
