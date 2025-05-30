@@ -183,12 +183,17 @@ import * as CoreState from '../core-state/index.js';
             if(!cond) fails.push(step); else pass++;
         };
 
+        const sendTurn = (hidden, visible) => {
+            SillyTavern.injectAssistant(
+                `<div style="display:none">${hidden}</div>${visible}`
+            );
+        };
+
         CoreState.clearState();
         await tick();
         assert(!document.querySelector('.sceneguard-warn'), 1);
 
-        RuleVault.processHiddenLine('::setScene item=Torch');
-        SillyTavern.injectAssistant('You spot a [Torch] on the wall.');
+        sendTurn('::setScene item=Torch', 'You spot a [Torch] on the wall.');
         await tick();
         assert(!document.querySelector('.sceneguard-warn'), 2);
 
@@ -200,8 +205,7 @@ import * as CoreState from '../core-state/index.js';
         await tick();
         assert(document.querySelectorAll('.sceneguard-warn').length === 1, 4);
 
-        RuleVault.processHiddenLine('::setScene item=Rat');
-        SillyTavern.injectAssistant('A [Rat] bares its teeth.');
+        sendTurn('::setScene item=Rat', 'A [Rat] bares its teeth.');
         await tick();
         assert(document.querySelectorAll('.sceneguard-warn').length === 0, 5);
 
