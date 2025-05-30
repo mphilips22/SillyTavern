@@ -1,7 +1,14 @@
 import { chat, eventSource, event_types } from '../../../script.js';
+import { SlashCommand } from '../../slash-commands/SlashCommand.js';
+import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
+import * as CoreState from '../core-state/index.js';
 
 (function(){
     const ctx = globalThis.SillyTavern?.getContext?.() ?? {};
+    ctx.extensionSettings ??= {};
+    ctx.extensionSettings.features ??= {};
+    ctx.extensionSettings.features.sceneguard ??= { enabled: true };
+    const settings = ctx.extensionSettings.features.sceneguard;
     let lastHadScene = true;
     let errorNode = null;
 
@@ -61,7 +68,7 @@ import { chat, eventSource, event_types } from '../../../script.js';
         if(!messageEl) return;
         clearError();
         const span = document.createElement('span');
-        span.className = 'system-bubble error';
+        span.className = 'system-bubble sceneguard-warn';
         span.textContent = text;
         messageEl.insertAdjacentElement('afterend', span);
         errorNode = span;
@@ -166,6 +173,45 @@ import { chat, eventSource, event_types } from '../../../script.js';
         }
     }
 
+    async function runSelfTest(){
+        if(!settings.enabled) return '';
+        const tick = () => new Promise(r => requestAnimationFrame(r));
+        const fails = [];
+        let pass = 0;
+        const assert = (cond, step) => {
+            console.assert(cond, 'step ' + step);
+            if(!cond) fails.push(step); else pass++;
+        };
+
+        CoreState.clearState();
+        await tick();
+        assert(!document.querySelector('.sceneguard-warn'), 1);
+
+        RuleVault.processHiddenLine('::setScene item=Torch');
+        SillyTavern.injectAssistant('You spot a [Torch] on the wall.');
+        await tick();
+        assert(!document.querySelector('.sceneguard-warn'), 2);
+
+        SillyTavern.injectAssistant('The corridor is dusty.');
+        await tick();
+        assert(!document.querySelector('.sceneguard-warn'), 3);
+
+        SillyTavern.injectAssistant('A rat scurries past.');
+        await tick();
+        assert(document.querySelectorAll('.sceneguard-warn').length === 1, 4);
+
+        RuleVault.processHiddenLine('::setScene item=Rat');
+        SillyTavern.injectAssistant('A [Rat] bares its teeth.');
+        await tick();
+        assert(document.querySelectorAll('.sceneguard-warn').length === 0, 5);
+
+        const text = fails.length
+            ? `*SceneGuard self-test failed: ${fails.join(',')} ❌*`
+            : `*SceneGuard self-test: ${pass} / 5 checks passed ✔️*`;
+        SillyTavern.injectAssistant(text, { name: 'SelfTest', italic: true });
+        return '';
+    }
+
     function init(){
         eventSource.makeFirst(event_types.MESSAGE_RECEIVED, onMessage);
         eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, onRendered);
@@ -187,4 +233,14 @@ import { chat, eventSource, event_types } from '../../../script.js';
 
     if(document.readyState !== 'loading') init();
     else document.addEventListener('DOMContentLoaded', init, { once: true });
+
+    if(settings.enabled){
+        SlashCommandParser.addCommandObject(
+            SlashCommand.fromProps({
+                name: 'sceneguard-selftest',
+                callback: runSelfTest,
+                helpString: 'Run the SceneGuard self-test.',
+            })
+        );
+    }
 })();
