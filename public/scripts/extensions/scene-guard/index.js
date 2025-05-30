@@ -1,4 +1,4 @@
-import { chat, eventSource, event_types } from '../../../script.js';
+import { chat, addOneMessage, eventSource, event_types, system_message_types } from '../../../script.js';
 import { SlashCommand } from '../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 import * as CoreState from '../core-state/index.js';
@@ -8,15 +8,24 @@ let pendingAF = 0; // requestAnimationFrame debounce id
 const inject = window.SillyTavern?.injectAssistant
             || window.ST?.injectAssistant
             || ((html, opts = {}) => {
-                 // ultra-light fallback: push straight into chat[]
-                 const chat = (window.SillyTavern?.getContext?.() || {}).chat || window.chat;
-                 if (!Array.isArray(chat)) return;
-                 chat.push({
-                   role: 'assistant',
+                 const ctx = window.SillyTavern?.getContext?.() ?? {};
+                 const chatArr = ctx.chat || window.chat;
+                 if (!Array.isArray(chatArr)) return;
+                 const message = {
                    name: opts.name || 'SelfTest',
-                   text: html,
-                   isAssistant: true,
-                 });
+                   is_user: false,
+                   is_system: false,
+                   send_date: Date.now(),
+                   mes: String(html),
+                   extra: { type: system_message_types.ASSISTANT_MESSAGE },
+                 };
+                 chatArr.push(message);
+                 const mid = chatArr.length - 1;
+                 eventSource.emit(event_types.MESSAGE_RECEIVED, mid, 'extension');
+                 addOneMessage(message);
+                 eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, mid, 'extension');
+                 ctx.saveChat?.();
+                 return mid;
                });
 
 (function(){
@@ -103,49 +112,51 @@ const inject = window.SillyTavern?.injectAssistant
         if(!id) return;
         const msg = ctx.chat?.[id];
         if(!msg || msg.is_user || msg.is_system) return;
-        const hiddenNodes = [...node.querySelectorAll('div[style*="display:none"]')];
-        const hasCtrl = hiddenNodes.some(d => /::\s*setScene/i.test(d.textContent));
-        const hidden = hiddenNodes.map(n=>n.textContent.trim()).reverse().find(t => /::\s*setScene/i.test(t));
-        let foundScene = false;
-        let missing = [];
-        if(hidden){
-            const cmds = parseCommands(hidden);
-            const scene = cmds.find(c=>c.verb==='setScene');
-            if(scene){
-                foundScene = true;
-                const items = parseItems(scene.args.items);
-                const clone = node.cloneNode(true);
-                hiddenNodes.forEach(n=>{
-                    const target = clone.querySelector('div[style*="display:none"]');
-                    if(target) target.remove();
-                });
-                const search = stripHtml(clone.innerHTML);
-                for(const it of items){
-                    const esc = it.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-                    const re = new RegExp(`\\[\\s*${esc}\\s*\\]`,`i`);
-                    if(!re.test(search)) missing.push(it);
+        if(!('__sceneGuardError' in msg)){
+            const hiddenNodes = [...node.querySelectorAll('div[style*="display:none"]')];
+            const hasCtrl = hiddenNodes.some(d => /::\s*setScene/i.test(d.textContent));
+            const hidden = hiddenNodes.map(n=>n.textContent.trim()).reverse().find(t => /::\s*setScene/i.test(t));
+            let foundScene = false;
+            let missing = [];
+            if(hidden){
+                const cmds = parseCommands(hidden);
+                const scene = cmds.find(c=>c.verb==='setScene');
+                if(scene){
+                    foundScene = true;
+                    const items = parseItems(scene.args.items);
+                    const clone = node.cloneNode(true);
+                    hiddenNodes.forEach(n=>{
+                        const target = clone.querySelector('div[style*="display:none"]');
+                        if(target) target.remove();
+                    });
+                    const search = stripHtml(clone.innerHTML);
+                    for(const it of items){
+                        const esc = it.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+                        const re = new RegExp(`\\[\\s*${esc}\\s*\\]`,`i`);
+                        if(!re.test(search)) missing.push(it);
+                    }
                 }
             }
-        }
-        if(!foundScene && hasCtrl){
-            foundScene = true;
-        }
-        msg.__sceneGuardError = null;
-        if(foundScene && missing.length){
-            warnCount = 0;
-            msg.__sceneGuardError = `⚠ Missing brackets for: ${missing.join(', ')}`;
-            removeHiddenLines(msg);
-        }else if(!foundScene){
-            warnCount++;
-            if(warnCount >= 2){
-                msg.__sceneGuardError = '⚠ Scene list stale — resend with setScene.';
-                removeHiddenLines(msg);
+            if(!foundScene && hasCtrl){
+                foundScene = true;
             }
-        }else{
-            warnCount = 0;
+            msg.__sceneGuardError = null;
+            if(foundScene && missing.length){
+                warnCount = 0;
+                msg.__sceneGuardError = `⚠ Missing brackets for: ${missing.join(', ')}`;
+                removeHiddenLines(msg);
+            }else if(!foundScene){
+                warnCount++;
+                if(warnCount >= 2){
+                    msg.__sceneGuardError = '⚠ Scene list stale — resend with setScene.';
+                    removeHiddenLines(msg);
+                }
+            }else{
+                warnCount = 0;
+            }
+            lastHadScene = foundScene;
         }
         if(msg.__sceneGuardError) showError(id, msg.__sceneGuardError); else clearError();
-        lastHadScene = foundScene;
     }
 
     function onMessage(id){
