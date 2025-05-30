@@ -182,7 +182,8 @@ const inject = window.SillyTavern?.injectAssistant
                 { name: 'SelfTest', italic: true }
             );
         };
-
+removeWarn();   // wipe any leftover ⚠ bubble
+missCount = 0;  // start the streak from scratch
         CoreState.clearState();
         await tick();
         assert(!document.querySelector('.sceneguard-warn'), 1);
