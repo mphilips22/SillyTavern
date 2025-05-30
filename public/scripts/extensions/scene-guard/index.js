@@ -4,6 +4,7 @@ import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 import * as CoreState from '../core-state/index.js';
 
 let pendingAF = 0; // requestAnimationFrame debounce id
+let missCount = 0;            // consecutive invalid turns
 
 const inject = window.SillyTavern?.injectAssistant
             || window.ST?.injectAssistant
@@ -35,7 +36,6 @@ const inject = window.SillyTavern?.injectAssistant
     ctx.extensionSettings.features.sceneguard ??= { enabled: true };
     const settings = ctx.extensionSettings.features.sceneguard;
     let lastHadScene = true;
-    let missCount = 0;
     let errorNode = null;
 
     function canon(id){
@@ -94,18 +94,17 @@ const inject = window.SillyTavern?.injectAssistant
         errorNode = null;
     }
 
- function showWarn(id, text){
-    let messageEl = document.querySelector(`#chat [mesid="${id}"] .mes_text`)
-                 || document.querySelector(`#chat [mesid="${id}"]`)
-                 || document.querySelector('#chat');   // ← fallback for SelfTest
-
-    if (!messageEl) return;   // final guard
+function showWarn(id, text){
+    const target =
+          document.querySelector(`#chat [mesid="${id}"] .mes_text`) ||
+          document.querySelector(`#chat [mesid="${id}"]`)           ||
+          document.querySelector('#chat');   // fallback (SelfTest)
+    if (!target) return;
     removeWarn();
     const span = document.createElement('span');
     span.className = 'system-bubble sceneguard-warn';
     span.textContent = text;
-    messageEl.insertAdjacentElement('afterend', span);
-    errorNode = span;
+    target.insertAdjacentElement('afterend', span);
 }
 
     function processNode(node){
@@ -113,7 +112,7 @@ const inject = window.SillyTavern?.injectAssistant
         if(!id) return;
         const msg = ctx.chat?.[id];
         if(!msg || msg.is_user || msg.is_system) return;
-        const hiddenNodes = [...node.querySelectorAll('div[style*="display:none"]')];
+          const hiddenNodes = [...node.querySelectorAll('div[style*="display:none"], div[style*="display: none"]')];
         const hasCtrl = hiddenNodes.some(d => /::\s*setScene/i.test(d.textContent));
         const hidden = hiddenNodes.map(n=>n.textContent.trim()).reverse().find(t => /::\s*setScene/i.test(t));
         let foundScene = false;
@@ -126,7 +125,7 @@ const inject = window.SillyTavern?.injectAssistant
                 const items = parseItems(scene.args.items);
                 const clone = node.cloneNode(true);
                 hiddenNodes.forEach(n=>{
-                    const target = clone.querySelector('div[style*="display:none"]');
+                     const target = clone.querySelector('div[style*="display:none"], div[style*="display: none"]');
                     if(target) target.remove();
                 });
                 const search = stripHtml(clone.innerHTML);
@@ -140,21 +139,15 @@ const inject = window.SillyTavern?.injectAssistant
         if(!foundScene && hasCtrl){
             foundScene = true;
         }
-        msg.__sceneGuardError = null;
         const isValid = foundScene && missing.length === 0;
-        if(isValid){
+        if (isValid) {
             missCount = 0;
             removeWarn();
-        }else{
+        } else {
             missCount++;
-            if(foundScene && missing.length){
-                msg.__sceneGuardError = `⚠ Missing brackets for: ${missing.join(', ')}`;
-                removeHiddenLines(msg);
-            }else if(missCount >= 2){
-                msg.__sceneGuardError = '⚠ Scene list stale — resend with setScene.';
-                removeHiddenLines(msg);
+            if (missCount >= 2 && !document.querySelector('.sceneguard-warn')) {
+                showWarn(msg.id, '⚠ Scene list stale — resend with setScene.');
             }
-            if(msg.__sceneGuardError) showWarn(id, msg.__sceneGuardError); else removeWarn();
         }
         lastHadScene = foundScene;
     }
@@ -162,11 +155,7 @@ const inject = window.SillyTavern?.injectAssistant
     function onRendered(id){
         const msg = ctx.chat?.[id];
         if(!msg || msg.is_user || msg.is_system) return;
-        if(msg.__sceneGuardError){
-            showWarn(id, msg.__sceneGuardError);
-        }else{
-            removeWarn();
-        }
+        removeWarn();
     }
 
     async function runSelfTest(){
