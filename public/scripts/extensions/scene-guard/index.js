@@ -1,4 +1,4 @@
-import { chat, eventSource, event_types } from '../../../script.js';
+import { chat, addOneMessage, eventSource, event_types, system_message_types } from '../../../script.js';
 import { SlashCommand } from '../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 import * as CoreState from '../core-state/index.js';
@@ -8,15 +8,24 @@ let pendingAF = 0; // requestAnimationFrame debounce id
 const inject = window.SillyTavern?.injectAssistant
             || window.ST?.injectAssistant
             || ((html, opts = {}) => {
-                 // ultra-light fallback: push straight into chat[]
-                 const chat = (window.SillyTavern?.getContext?.() || {}).chat || window.chat;
-                 if (!Array.isArray(chat)) return;
-                 chat.push({
-                   role: 'assistant',
+                 const ctx = window.SillyTavern?.getContext?.() ?? {};
+                 const chatArr = ctx.chat || window.chat;
+                 if (!Array.isArray(chatArr)) return;
+                 const message = {
                    name: opts.name || 'SelfTest',
-                   text: html,
-                   isAssistant: true,
-                 });
+                   is_user: false,
+                   is_system: false,
+                   send_date: Date.now(),
+                   mes: String(html),
+                   extra: { type: system_message_types.ASSISTANT_MESSAGE },
+                 };
+                 chatArr.push(message);
+                 const mid = chatArr.length - 1;
+                 eventSource.emit(event_types.MESSAGE_RECEIVED, mid, 'extension');
+                 addOneMessage(message);
+                 eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, mid, 'extension');
+                 ctx.saveChat?.();
+                 return mid;
                });
 
 (function(){
