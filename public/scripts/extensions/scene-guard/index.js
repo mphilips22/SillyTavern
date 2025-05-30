@@ -74,6 +74,50 @@ import { chat, eventSource, event_types } from '../../../script.js';
         }
     }
 
+    function processNode(node){
+        const id = node?.getAttribute('mesid');
+        if(!id) return;
+        const msg = ctx.chat?.[id];
+        if(!msg || msg.is_user || msg.is_system) return;
+        const hiddenNodes = [...node.querySelectorAll('div[style*="display:none"]')];
+        const hasCtrl = hiddenNodes.some(d => /::\s*setScene/i.test(d.textContent));
+        const hidden = hiddenNodes.map(n=>n.textContent.trim()).reverse().find(t => /::\s*setScene/i.test(t));
+        let foundScene = false;
+        let missing = [];
+        if(hidden){
+            const cmds = parseCommands(hidden);
+            const scene = cmds.find(c=>c.verb==='setScene');
+            if(scene){
+                foundScene = true;
+                const items = parseItems(scene.args.items);
+                const clone = node.cloneNode(true);
+                hiddenNodes.forEach(n=>{
+                    const target = clone.querySelector('div[style*="display:none"]');
+                    if(target) target.remove();
+                });
+                const search = stripHtml(clone.innerHTML);
+                for(const it of items){
+                    const esc = it.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+                    const re = new RegExp(`\\[\\s*${esc}\\s*\\]`,`i`);
+                    if(!re.test(search)) missing.push(it);
+                }
+            }
+        }
+        if(!foundScene && hasCtrl){
+            foundScene = true;
+        }
+        msg.__sceneGuardError = null;
+        if(!foundScene && !lastHadScene){
+            msg.__sceneGuardError = '⚠ Scene list stale — resend with setScene.';
+            removeHiddenLines(msg);
+        }else if(foundScene && missing.length){
+            msg.__sceneGuardError = `⚠ Missing brackets for: ${missing.join(', ')}`;
+            removeHiddenLines(msg);
+        }
+        if(msg.__sceneGuardError) showError(id, msg.__sceneGuardError); else clearError();
+        lastHadScene = foundScene;
+    }
+
     function onMessage(id){
         const msg = ctx.chat?.[id];
         if(!msg || msg.is_user || msg.is_system) return;
@@ -125,6 +169,20 @@ import { chat, eventSource, event_types } from '../../../script.js';
     function init(){
         eventSource.makeFirst(event_types.MESSAGE_RECEIVED, onMessage);
         eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, onRendered);
+        const chatBox = document.getElementById('chat');
+        if(chatBox){
+            new MutationObserver(muts=>{
+                setTimeout(()=>{
+                    muts.forEach(m=>{
+                        m.addedNodes.forEach(node=>{
+                            if(node.nodeType!==1) return;
+                            if(!node.classList.contains('mes')) return;
+                            processNode(node);
+                        });
+                    });
+                },0);
+            }).observe(chatBox,{childList:true});
+        }
     }
 
     if(document.readyState !== 'loading') init();
