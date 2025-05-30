@@ -100,6 +100,7 @@ function showWarn(id, text){
           document.querySelector(`#chat [mesid="${id}"]`)           ||
           document.querySelector('#chat');   // fallback (SelfTest)
     if (!target) return;
+    console.debug('[SceneGuard] showWarn', id, text);
     removeWarn();
     const span = document.createElement('span');
     span.className = 'system-bubble sceneguard-warn';
@@ -142,6 +143,13 @@ function showWarn(id, text){
             foundScene = true;
         }
         const isValid = foundScene && missing.length === 0;
+        console.debug('[SceneGuard] processed node', {
+            id,
+            foundScene,
+            missing,
+            isValid,
+            missCountBefore: missCount,
+        });
         if (isValid) {
             missCount = 0;
             removeWarn();
@@ -190,6 +198,7 @@ missCount = 0;  // start the streak from scratch
         inject('A rat scurries past.', { name: 'SelfTest', italic: true });
         await tick();
         await tick();
+        console.debug('[SceneGuard self-test] step 4 warn count', document.querySelectorAll('.sceneguard-warn').length, 'missCount', missCount);
         assert(document.querySelectorAll('.sceneguard-warn').length === 1, 4);
 
         sendTurn('::setScene item=Rat', 'A [Rat] bares its teeth.');
