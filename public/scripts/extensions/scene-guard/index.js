@@ -94,16 +94,20 @@ const inject = window.SillyTavern?.injectAssistant
         errorNode = null;
     }
 
-    function showWarn(id, text){
-        const messageEl = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
+ function showWarn(id, text){
+    let messageEl = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
+    if(!messageEl){
+        // fallback: use the message container itself
+        messageEl = document.querySelector(`#chat [mesid="${id}"]`);
         if(!messageEl) return;
-        removeWarn();
-        const span = document.createElement('span');
-        span.className = 'system-bubble sceneguard-warn';
-        span.textContent = text;
-        messageEl.insertAdjacentElement('afterend', span);
-        errorNode = span;
     }
+    removeWarn();
+    const span = document.createElement('span');
+    span.className = 'system-bubble sceneguard-warn';
+    span.textContent = text;
+    messageEl.insertAdjacentElement('afterend', span);
+    errorNode = span;
+}
 
     function processNode(node){
         const id = node?.getAttribute('mesid');
@@ -190,17 +194,21 @@ missCount = 0;  // start the streak from scratch
 
         sendTurn('::setScene item=Torch', 'You spot a [Torch] on the wall.');
         await tick();
+        await tick();
         assert(!document.querySelector('.sceneguard-warn'), 2);
 
         inject('The corridor is dusty.', { name: 'SelfTest', italic: true });
+        await tick();
         await tick();
         assert(!document.querySelector('.sceneguard-warn'), 3);
 
         inject('A rat scurries past.', { name: 'SelfTest', italic: true });
         await tick();
+        await tick();
         assert(document.querySelectorAll('.sceneguard-warn').length === 1, 4);
 
         sendTurn('::setScene item=Rat', 'A [Rat] bares its teeth.');
+        await tick();
         await tick();
         assert(document.querySelectorAll('.sceneguard-warn').length === 0, 5);
 
