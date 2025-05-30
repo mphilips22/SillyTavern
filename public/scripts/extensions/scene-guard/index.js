@@ -3,6 +3,8 @@ import { SlashCommand } from '../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 import * as CoreState from '../core-state/index.js';
 
+let pendingAF = 0; // requestAnimationFrame debounce id
+
 const inject = window.SillyTavern?.injectAssistant
             || window.ST?.injectAssistant
             || ((html, opts = {}) => {
@@ -236,17 +238,18 @@ const inject = window.SillyTavern?.injectAssistant
         eventSource.makeLast(event_types.CHARACTER_MESSAGE_RENDERED, onRendered);
         const chatBox = document.getElementById('chat');
         if(chatBox){
-            new MutationObserver(muts=>{
-                setTimeout(()=>{
-                    muts.forEach(m=>{
-                        m.addedNodes.forEach(node=>{
-                            if(node.nodeType!==1) return;
-                            if(!node.classList.contains('mes')) return;
+            new MutationObserver(muts => {
+                muts.forEach(m => {
+                    m.addedNodes.forEach(node => {
+                        if (node.nodeType !== 1) return;
+                        if (!node.classList.contains('mes')) return;
+                        cancelAnimationFrame(pendingAF);
+                        pendingAF = requestAnimationFrame(() => {
                             processNode(node);
                         });
                     });
-                },0);
-            }).observe(chatBox,{childList:true});
+                });
+            }).observe(chatBox, { childList: true });
         }
     }
 
