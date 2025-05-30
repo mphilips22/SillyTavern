@@ -95,12 +95,11 @@ const inject = window.SillyTavern?.injectAssistant
     }
 
  function showWarn(id, text){
-    let messageEl = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
-    if(!messageEl){
-        // fallback: use the message container itself
-        messageEl = document.querySelector(`#chat [mesid="${id}"]`);
-        if(!messageEl) return;
-    }
+    let messageEl = document.querySelector(`#chat [mesid="${id}"] .mes_text`)
+                 || document.querySelector(`#chat [mesid="${id}"]`)
+                 || document.querySelector('#chat');   // ← fallback for SelfTest
+
+    if (!messageEl) return;   // final guard
     removeWarn();
     const span = document.createElement('span');
     span.className = 'system-bubble sceneguard-warn';
