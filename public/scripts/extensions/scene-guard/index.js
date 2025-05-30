@@ -26,6 +26,7 @@ const inject = window.SillyTavern?.injectAssistant
     ctx.extensionSettings.features.sceneguard ??= { enabled: true };
     const settings = ctx.extensionSettings.features.sceneguard;
     let lastHadScene = true;
+    let warnCount = 0;
     let errorNode = null;
 
     function canon(id){
@@ -130,12 +131,18 @@ const inject = window.SillyTavern?.injectAssistant
             foundScene = true;
         }
         msg.__sceneGuardError = null;
-        if(!foundScene && !lastHadScene){
-            msg.__sceneGuardError = '⚠ Scene list stale — resend with setScene.';
-            removeHiddenLines(msg);
-        }else if(foundScene && missing.length){
+        if(foundScene && missing.length){
+            warnCount = 0;
             msg.__sceneGuardError = `⚠ Missing brackets for: ${missing.join(', ')}`;
             removeHiddenLines(msg);
+        }else if(!foundScene){
+            warnCount++;
+            if(warnCount >= 2){
+                msg.__sceneGuardError = '⚠ Scene list stale — resend with setScene.';
+                removeHiddenLines(msg);
+            }
+        }else{
+            warnCount = 0;
         }
         if(msg.__sceneGuardError) showError(id, msg.__sceneGuardError); else clearError();
         lastHadScene = foundScene;
@@ -169,12 +176,18 @@ const inject = window.SillyTavern?.injectAssistant
             }
         }
         msg.__sceneGuardError = null;
-        if(!foundScene && !lastHadScene){
-            msg.__sceneGuardError = '⚠ Scene list stale — resend with setScene.';
-            removeHiddenLines(msg);
-        }else if(foundScene && missing.length){
+        if(foundScene && missing.length){
+            warnCount = 0;
             msg.__sceneGuardError = `⚠ Missing brackets for: ${missing.join(', ')}`;
             removeHiddenLines(msg);
+        }else if(!foundScene){
+            warnCount++;
+            if(warnCount >= 2){
+                msg.__sceneGuardError = '⚠ Scene list stale — resend with setScene.';
+                removeHiddenLines(msg);
+            }
+        }else{
+            warnCount = 0;
         }
         lastHadScene = foundScene;
     }
