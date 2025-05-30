@@ -148,7 +148,7 @@ function showWarn(id, text){
         } else {
             missCount++;
             if (missCount >= 2 && !document.querySelector('.sceneguard-warn')) {
-                showWarn(msg.id, '⚠ Scene list stale — resend with setScene.');
+                showWarn(id, '⚠ Scene list stale — resend with setScene.');
             }
         }
         lastHadScene = foundScene;
