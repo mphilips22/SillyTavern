@@ -404,6 +404,13 @@ function processPacket(cmds){
     actions.forEach(fn=>fn());
 }
 
+function processHiddenLine(line){
+    const cmds = parseCommands(String(line || '').trim());
+    if(cmds.length){
+        processPacket(cmds);
+    }
+}
+
 function onMessage(id){
     const mes = chat?.[id];
     if(!mes || mes.is_user || mes.is_system) return;
@@ -597,6 +604,7 @@ else document.addEventListener('DOMContentLoaded', init, { once:true });
 
 window.RuleVault = Object.assign(window.RuleVault || {}, {
     getStrict: () => STRICT,
+    processHiddenLine,
 });
 
 export {};
