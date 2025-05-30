@@ -1,4 +1,4 @@
-import { chat, eventSource, event_types } from '../../../script.js';
+import { chat, addOneMessage, eventSource, event_types, system_message_types } from '../../../script.js';
 import { SlashCommand } from '../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 import * as CoreState from '../core-state/index.js';
@@ -8,15 +8,22 @@ let pendingAF = 0; // requestAnimationFrame debounce id
 const inject = window.SillyTavern?.injectAssistant
             || window.ST?.injectAssistant
             || ((html, opts = {}) => {
-                 // ultra-light fallback: push straight into chat[]
-                 const chat = (window.SillyTavern?.getContext?.() || {}).chat || window.chat;
-                 if (!Array.isArray(chat)) return;
-                 chat.push({
-                   role: 'assistant',
+                 const message = {
                    name: opts.name || 'SelfTest',
-                   text: html,
-                   isAssistant: true,
-                 });
+                   is_user: false,
+                   is_system: false,
+                   send_date: Date.now(),
+                   mes: String(html),
+                   extra: { type: system_message_types.ASSISTANT_MESSAGE },
+                 };
+                 chat.push(message);
+                 const mid = chat.length - 1;
+                 eventSource.emit(event_types.MESSAGE_RECEIVED, mid, 'extension');
+                 addOneMessage(message);
+                 eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, mid, 'extension');
+                 const ctx = globalThis.SillyTavern?.getContext?.();
+                 ctx?.saveChat?.();
+                 return mid;
                });
 
 (function(){
@@ -210,7 +217,7 @@ const inject = window.SillyTavern?.injectAssistant
         await tick();
         assert(!document.querySelector('.sceneguard-warn'), 1);
 
-        sendTurn('::setScene item=Torch', 'You spot a [Torch] on the wall.');
+        sendTurn('::setScene items=[Torch]', 'You spot a [Torch] on the wall.');
         await tick();
         assert(!document.querySelector('.sceneguard-warn'), 2);
 
@@ -222,7 +229,7 @@ const inject = window.SillyTavern?.injectAssistant
         await tick();
         assert(document.querySelectorAll('.sceneguard-warn').length === 1, 4);
 
-        sendTurn('::setScene item=Rat', 'A [Rat] bares its teeth.');
+        sendTurn('::setScene items=[Rat]', 'A [Rat] bares its teeth.');
         await tick();
         assert(document.querySelectorAll('.sceneguard-warn').length === 0, 5);
 
