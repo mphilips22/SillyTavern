@@ -113,7 +113,7 @@ function showWarn(id, text){
         if(!id) return;
         const msg = ctx.chat?.[id];
         if(!msg || msg.is_user || msg.is_system) return;
-          const hiddenNodes = [...node.querySelectorAll('div[style]')]
+        const hiddenNodes = [...node.querySelectorAll('.mes_text div[style]')]
                     .filter(el => el.style.display === 'none');
         const hasCtrl = hiddenNodes.some(d => /::\s*setScene/i.test(d.textContent));
         const hidden = hiddenNodes.map(n=>n.textContent.trim()).reverse().find(t => /::\s*setScene/i.test(t));
