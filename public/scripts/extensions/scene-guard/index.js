@@ -89,22 +89,20 @@ const inject = window.SillyTavern?.injectAssistant
         if('mes_html' in msg) msg.mes_html = clean;
     }
 
-    function showError(id, text){
+    function removeWarn(){
+        document.querySelectorAll('.sceneguard-warn').forEach(el => el.remove());
+        errorNode = null;
+    }
+
+    function showWarn(id, text){
         const messageEl = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
         if(!messageEl) return;
-        clearError();
+        removeWarn();
         const span = document.createElement('span');
         span.className = 'system-bubble sceneguard-warn';
         span.textContent = text;
         messageEl.insertAdjacentElement('afterend', span);
         errorNode = span;
-    }
-
-    function clearError(){
-        if(errorNode){
-            errorNode.remove();
-            errorNode = null;
-        }
     }
 
     function processNode(node){
@@ -145,15 +143,14 @@ const inject = window.SillyTavern?.injectAssistant
             msg.__sceneGuardError = `⚠ Missing brackets for: ${missing.join(', ')}`;
             removeHiddenLines(msg);
         }else if(!foundScene){
-            warnCount++;
-            if(warnCount >= 2){
+            if(warnCount >= 2 && !document.querySelector('.sceneguard-warn')){
                 msg.__sceneGuardError = '⚠ Scene list stale — resend with setScene.';
                 removeHiddenLines(msg);
             }
         }else{
             warnCount = 0;
         }
-        if(msg.__sceneGuardError) showError(id, msg.__sceneGuardError); else clearError();
+        if(msg.__sceneGuardError) showWarn(id, msg.__sceneGuardError); else removeWarn();
         lastHadScene = foundScene;
     }
 
@@ -205,9 +202,9 @@ const inject = window.SillyTavern?.injectAssistant
         const msg = ctx.chat?.[id];
         if(!msg || msg.is_user || msg.is_system) return;
         if(msg.__sceneGuardError){
-            showError(id, msg.__sceneGuardError);
+            showWarn(id, msg.__sceneGuardError);
         }else{
-            clearError();
+            removeWarn();
         }
     }
 
