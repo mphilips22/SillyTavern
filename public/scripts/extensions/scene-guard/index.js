@@ -222,10 +222,7 @@ missCount = 0;  // start the streak from scratch
                     m.addedNodes.forEach(node => {
                         if (node.nodeType !== 1) return;
                         if (!node.classList.contains('mes')) return;
-                        cancelAnimationFrame(pendingAF);
-                        pendingAF = requestAnimationFrame(() => {
-                            processNode(node);
-                        });
+                       requestAnimationFrame(() => processNode(node));
                     });
                 });
             }).observe(chatBox, { childList: true });
