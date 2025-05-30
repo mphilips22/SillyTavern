@@ -113,7 +113,7 @@ const inject = window.SillyTavern?.injectAssistant
         if(!id) return;
         const msg = ctx.chat?.[id];
         if(!msg || msg.is_user || msg.is_system) return;
-        const hiddenNodes = [...node.querySelectorAll('div[style*="display:none"]')];
+        const hiddenNodes = [...node.querySelectorAll('div[style*="display:none"], div[style*="display: none"]')];
         const hasCtrl = hiddenNodes.some(d => /::\s*setScene/i.test(d.textContent));
         const hidden = hiddenNodes.map(n=>n.textContent.trim()).reverse().find(t => /::\s*setScene/i.test(t));
         let foundScene = false;
@@ -126,7 +126,7 @@ const inject = window.SillyTavern?.injectAssistant
                 const items = parseItems(scene.args.items);
                 const clone = node.cloneNode(true);
                 hiddenNodes.forEach(n=>{
-                    const target = clone.querySelector('div[style*="display:none"]');
+                    const target = clone.querySelector('div[style*="display:none"], div[style*="display: none"]');
                     if(target) target.remove();
                 });
                 const search = stripHtml(clone.innerHTML);
