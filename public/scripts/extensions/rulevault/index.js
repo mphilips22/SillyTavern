@@ -418,6 +418,11 @@ function processHiddenLine(line){
 function onMessage(id){
     const mes = chat?.[id];
     if(!mes || mes.is_user || mes.is_system) return;
+
+    const node = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
+    const hiddenNodes = node ? [...node.querySelectorAll('div[hidden]')] : [];
+    const hiddenText = hiddenNodes.map(n => n.textContent).join('\n');
+
     const raw = mes.mes_html ? stripHtml(mes.mes_html) : mes.mes || '';
     const lines = String(raw).split(/\r?\n/);
     if(!lines.length) return;
@@ -454,6 +459,27 @@ function onMessage(id){
     const newText = newLines.join('\n');
     mes.mes = newText;
     if('mes_html' in mes) mes.mes_html = newText;
+
+    if(node && hiddenNodes.length){
+        const msgText = newText;
+        const hpRegex = /\bHP\s*([+-]\d+)/gi;
+        const mpRegex = /\bMP\s*([+-]\d+)/gi;
+        const hpList = [...msgText.matchAll(hpRegex)].map(m => parseInt(m[1], 10));
+        const mpList = [...msgText.matchAll(mpRegex)].map(m => parseInt(m[1], 10));
+        const lastHidden = hiddenNodes[hiddenNodes.length - 1];
+
+        if(hpList.length && !/::modHP\b/.test(hiddenText)){
+            const total = hpList.reduce((a,b)=>a+b,0);
+            lastHidden.textContent += `\n::modHP target=${personaName()} amount=${total}`;
+            CoreState.modHP(personaName(), total);
+        }
+
+        if(mpList.length && !/::modMP\b/.test(hiddenText)){
+            const total = mpList.reduce((a,b)=>a+b,0);
+            lastHidden.textContent += `\n::modMP target=${personaName()} amount=${total}`;
+            CoreState.modMP(personaName(), total);
+        }
+    }
 }
 
 async function runSmokeTest(){
