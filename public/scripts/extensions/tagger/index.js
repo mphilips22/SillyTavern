@@ -196,9 +196,10 @@ function fuzzyHighlightElement(el){
         },
     });
     const done = new Set();
-    for(let node = walker.nextNode(); node; node = walker.nextNode()){
+    for(let node = walker.nextNode(); node;){
         const text = node.nodeValue;
         const spans = [...ngramSpans(text)];
+        let replaced = false;
         for(const span of spans){
             let clean = stripAdj(span.text.toLowerCase());
             if(!clean) continue;
@@ -226,17 +227,24 @@ function fuzzyHighlightElement(el){
             }
             if(id){
                 const frag = document.createDocumentFragment();
-                frag.appendChild(document.createTextNode(text.slice(0,span.start)));
+                frag.appendChild(document.createTextNode(text.slice(0, span.start)));
                 const sp = document.createElement('span');
                 sp.className = 'rpg-item scene';
                 sp.dataset.itemId = id;
-                sp.textContent = text.slice(span.start,span.end);
+                sp.textContent = text.slice(span.start, span.end);
                 frag.appendChild(sp);
-                frag.appendChild(document.createTextNode(text.slice(span.end)));
+                const after = document.createTextNode(text.slice(span.end));
+                frag.appendChild(after);
                 node.replaceWith(frag);
                 done.add(id);
+                walker.currentNode = after;
+                node = after;
+                replaced = true;
                 break;
             }
+        }
+        if(!replaced){
+            node = walker.nextNode();
         }
     }
 }
