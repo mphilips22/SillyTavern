@@ -16,6 +16,11 @@ function canon(label){
 
 const ADJ_STOP = ['warm','old','shiny','ancient','rusty','broken','cold','small','large'];
 const STOP_SINGLE = ['a','the','you','to','of','in','on','it'];
+const COMMON_WORDS = [
+    'skull', 'mug', 'cooking', 'pot', 'weathered', 'crate', 'wooden', 'table', 'fake', 'gem', 'apple',
+    'torch', 'door', 'key', 'sword', 'shield', 'book', 'scroll', 'bottle', 'box', 'bag', 'chair',
+    'stone', 'rock', 'rope', 'axe', 'dagger', 'bow', 'arrow', 'staff', 'rod', 'cup', 'bowl', 'plate', 'glass',
+];
 
 function stripAdj(text){
     const parts = text.trim().split(/\s+/);
@@ -33,14 +38,29 @@ function tokeniseID(id){
         .filter(Boolean);
 }
 
-function camelToDisplay(id){
-    const txt = String(id || '')
-        .replace(/([a-z])([A-Z0-9])/g, '$1 $2')
-        .replace(/([0-9])([a-zA-Z])/g, '$1 $2')
-        .replace(/[_-]+/g, ' ')
-        .trim()
-        .replace(/\s+/g, ' ');
-    return txt.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+function splitCanonicalTokens(id){
+    let tokens = tokeniseID(id);
+    if(tokens.length > 1) return tokens;
+    const str = tokens[0] || '';
+    const dict = COMMON_WORDS.slice().sort((a,b)=>b.length - a.length);
+    const words = [];
+    let pos = 0;
+    while(pos < str.length){
+        let matched = false;
+        for(const w of dict){
+            if(str.startsWith(w, pos)){
+                words.push(w);
+                pos += w.length;
+                matched = true;
+                break;
+            }
+        }
+        if(!matched){
+            words.push(str.slice(pos));
+            break;
+        }
+    }
+    return words;
 }
 
 function parseItems(str){
@@ -65,7 +85,7 @@ function parseCommands(line){
         while((match = re.exec(argStr)) !== null){
             let val = match[2];
             if ((val.startsWith('"') && val.endsWith('"')) ||
-                (val.startsWith("'") && val.endsWith("'"))) {
+                (val.startsWith('\'') && val.endsWith('\''))) {
                 val = val.slice(1, -1);
             }
             val = val.replace(/<[^>]*>/g,'');
@@ -80,14 +100,15 @@ function buildAliasMap(sceneIds = []){
     const map = {};
     for(const raw of sceneIds){
         const id = canon(raw);
-        const display = camelToDisplay(raw);
-        if(!display) continue;
-        const phrase = display.toLowerCase();
-        const tokens = phrase.split(/\s+/);
+        if(!id) continue;
+        let tokens = splitCanonicalTokens(raw);
+        const phrase = tokens.join(' ').toLowerCase();
         const last = tokens[tokens.length - 1];
-        map[phrase] = id;
-        map[phrase.replace(/\s+/g,'')] = id;
-        if(last.length >= 4 && !STOP_SINGLE.includes(last) && !map[last]) {
+        if(phrase) {
+            map[phrase] = id;
+            map[phrase.replace(/\s+/g,'')] = id;
+        }
+        if(last && last.length >= 4 && !STOP_SINGLE.includes(last) && !map[last]) {
             map[last] = id;
         }
         map[id.toLowerCase()] = id;
