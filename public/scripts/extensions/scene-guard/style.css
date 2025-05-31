@@ -1,5 +1,6 @@
 .system-bubble.sceneguard-warn {
-    color: var(--warning);
+    /* Fallback to red if --warning isn't defined */
+    color: var(--warning, red);
     font-style: italic;
     display: block;
     margin: 4px 0;
