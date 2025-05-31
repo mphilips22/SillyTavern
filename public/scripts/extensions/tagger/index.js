@@ -1,3 +1,4 @@
+/* global RuleVault */
 import { chat, addOneMessage, eventSource, event_types, system_message_types } from '../../../script.js';
 import * as CoreState from '../core-state/index.js';
 import { SlashCommand } from '../../slash-commands/SlashCommand.js';
@@ -11,6 +12,85 @@ const settings = ctx.extensionSettings.features.tagger;
 
 function canon(label){
     return window.RuleVault?.canon?.(label) ?? String(label || '').toLowerCase().replace(/[^a-z0-9]/g,'');
+}
+
+const ADJ_STOP = ['warm','old','shiny','ancient','rusty','broken','cold','small','large'];
+
+function stripAdj(text){
+    const parts = text.trim().split(/\s+/);
+    while(parts.length && ADJ_STOP.includes(parts[0])) parts.shift();
+    return parts.join(' ');
+}
+
+function tokeniseID(id){
+    return String(id || '')
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/[_-]+/g, ' ')
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean);
+}
+
+function buildAliasMap(sceneIds = []){
+    const map = {};
+    for(const raw of sceneIds){
+        const id = canon(raw);
+        const tokens = tokeniseID(raw);
+        if(!tokens.length) continue;
+        const phrase = tokens.join(' ');
+        const last = tokens[tokens.length - 1];
+        map[phrase] = id;
+        if(!map[last]) map[last] = id;
+        map[id] = id;
+    }
+    return map;
+}
+
+function* ngramSpans(text, max = 3){
+    const words = [];
+    const re = /\b\w+\b/g;
+    let m;
+    while((m = re.exec(text))){
+        words.push({ word:m[0], index:m.index });
+    }
+    for(let i = 0;i < words.length;i++){
+        for(let n = 1;n <= max && i + n - 1 < words.length;n++){
+            const start = words[i].index;
+            const endWord = words[i + n - 1];
+            const end = endWord.index + endWord.word.length;
+            yield { start,end,text:text.slice(start,end) };
+        }
+    }
+}
+
+function distance(a,b){
+    if(a === b) return { dist:0,ratio:1 };
+    const la = a.length, lb = b.length;
+    const dp = new Array(la + 1);
+    for(let i = 0;i <= la;i++){dp[i] = new Array(lb + 1);dp[i][0] = i;}
+    for(let j = 1;j <= lb;j++) dp[0][j] = j;
+    for(let i = 1;i <= la;i++){
+        for(let j = 1;j <= lb;j++){
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+        }
+    }
+    const dist = dp[la][lb];
+    const ratio = 1 - dist / Math.max(la,lb);
+    return { dist,ratio };
+}
+
+let aliasMap = {};
+let cachedSynonyms = {};
+
+function cacheSyn(id, phrase){
+    cachedSynonyms[phrase] = id;
+    aliasMap[phrase] = id;
+}
+
+function refreshAliasMap(){
+    aliasMap = buildAliasMap(CoreState.getState().sceneObjects || []);
+    aliasMap = Object.assign({}, aliasMap, cachedSynonyms);
 }
 
 function injectCss(){
@@ -52,14 +132,61 @@ function tagElement(el){
         },
     });
     const nodes = [];
-    for(let n=walker.nextNode(); n; n=walker.nextNode()) nodes.push(n);
+    for(let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
     nodes.forEach(tagTextNode);
+}
+
+function fuzzyHighlightElement(el){
+    if(!el) return;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+        acceptNode(node){
+            if(!node.nodeValue) return NodeFilter.FILTER_REJECT;
+            if(node.parentElement.closest('.rpg-item, code, pre')) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+        },
+    });
+    const done = new Set();
+    for(let node = walker.nextNode(); node; node = walker.nextNode()){
+        const text = node.nodeValue;
+        const spans = [...ngramSpans(text)];
+        for(const span of spans){
+            let clean = stripAdj(span.text.toLowerCase());
+            if(!clean) continue;
+            let id = aliasMap[clean];
+            if(id && done.has(id)) continue;
+            if(!id){
+                for(const [alias,aid] of Object.entries(aliasMap)){
+                    if(done.has(aid)) continue;
+                    const { dist,ratio } = distance(clean, alias);
+                    if(dist <= 2 || ratio >= 0.9){
+                        id = aid;
+                        cacheSyn(aid, clean);
+                        break;
+                    }
+                }
+            }
+            if(id){
+                const frag = document.createDocumentFragment();
+                frag.appendChild(document.createTextNode(text.slice(0,span.start)));
+                const sp = document.createElement('span');
+                sp.className = 'rpg-item scene';
+                sp.dataset.itemId = id;
+                sp.textContent = text.slice(span.start,span.end);
+                frag.appendChild(sp);
+                frag.appendChild(document.createTextNode(text.slice(span.end)));
+                node.replaceWith(frag);
+                done.add(id);
+                break;
+            }
+        }
+    }
 }
 
 function highlightAll(){
     document.querySelectorAll('#chat .mes_text').forEach(el => {
         autoBracket(el);
         tagElement(el);
+        fuzzyHighlightElement(el);
     });
 }
 
@@ -75,9 +202,9 @@ function autoBracket(el){
     if(!el) return;
     const state = CoreState.getState();
     const player = state.characters?.[CoreState.playerName] || {};
-    const labels = [...new Set([...(state.sceneObjects||[]), ...(player.inventory||[])])]
+    const labels = [...new Set([...(state.sceneObjects || []), ...(player.inventory || [])])]
         .filter(Boolean)
-        .sort((a,b)=>b.length-a.length);
+        .sort((a,b)=>b.length - a.length);
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
         acceptNode(node){
             if(!node.nodeValue) return NodeFilter.FILTER_REJECT;
@@ -85,7 +212,7 @@ function autoBracket(el){
             return NodeFilter.FILTER_ACCEPT;
         },
     });
-    for(let n=walker.nextNode(); n; n=walker.nextNode()){
+    for(let n = walker.nextNode(); n; n = walker.nextNode()){
         let txt = n.nodeValue;
         for(const label of labels){
             const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -121,6 +248,7 @@ function onMessageRendered(id){
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     autoBracket(el);
     tagElement(el);
+    fuzzyHighlightElement(el);
     recolorAll();
 }
 
@@ -141,9 +269,9 @@ function assistantBubble(text){
 
 async function runSelfTest(){
     // helper – paste near the top of runSelfTest
-const setStrict = flag => {
-  RuleVault.strict = !!flag;          // same field the slash-command toggles
-};
+    const setStrict = flag => {
+        RuleVault.strict = !!flag;          // same field the slash-command toggles
+    };
     if(!settings.enabled) return '';
     const tick = () => new Promise(r => requestAnimationFrame(r));
     const events = { sceneUpdate:0, itemAdd:0, itemRemove:0, stateReset:0 };
@@ -174,7 +302,7 @@ const setStrict = flag => {
         recolorAll();
         assert(
             [...document.querySelectorAll('#chat .rpg-item')].every(sp => sp.classList.contains('unknown')),
-            'Existing items should be tagged unknown after state reset'
+            'Existing items should be tagged unknown after state reset',
         );
         step++;
 
@@ -183,7 +311,7 @@ const setStrict = flag => {
         let d = delta(before);
         assert(
             CoreState.getState().sceneObjects.includes(canon('Apple')) && d.sceneUpdate === 1,
-            'Apple should be in scene and sceneUpdate event fired'
+            'Apple should be in scene and sceneUpdate event fired',
         );
         step++;
 
@@ -192,7 +320,7 @@ const setStrict = flag => {
         const sp1 = document.querySelector(`#chat [mesid="${id1}"] .rpg-item`);
         assert(
             sp1 && sp1.classList.contains('scene'),
-            'First apple should be tagged as scene'
+            'First apple should be tagged as scene',
         );
         step++;
 
@@ -202,7 +330,7 @@ const setStrict = flag => {
         recolorAll();
         assert(
             sp1.classList.contains('inv') && d.itemAdd === 1,
-            'Item should move to inventory and itemAdd event fired'
+            'Item should move to inventory and itemAdd event fired',
         );
         step++;
 
@@ -211,7 +339,7 @@ const setStrict = flag => {
         const sp2 = document.querySelector(`#chat [mesid="${id2}"] .rpg-item`);
         assert(
             sp2 && sp2.classList.contains('inv'),
-            'Second apple should be tagged as inv'
+            'Second apple should be tagged as inv',
         );
         step++;
 
@@ -223,7 +351,7 @@ const setStrict = flag => {
         const allScene = [sp1, sp2].every(sp => sp.classList.contains('scene'));
         assert(
             allScene && d.sceneUpdate === 1 && d.itemRemove === 1,
-            'Apples should be scene items after removal with events fired'
+            'Apples should be scene items after removal with events fired',
         );
         step++;
 
@@ -256,21 +384,29 @@ const setStrict = flag => {
         CoreState.setScene([canon('Apple')]);
         injectAssistant('Night falls over the [ APPLE ] again.');
         await tick();
-        const weirdApple = document.querySelector('.rpg-item.scene[data-item-id="'+canon('Apple')+'"]');
+        const weirdApple = document.querySelector('.rpg-item.scene[data-item-id="' + canon('Apple') + '"]');
         assert(weirdApple, 'Bracketed label with spaces/case maps to Apple');
         step++;
 
         /* 12 – no double-wrap on re-run */
-        const beforeCount = document.querySelectorAll('.rpg-item[data-item-id="'+canon('Apple')+'"]').length;
+        const beforeCount = document.querySelectorAll('.rpg-item[data-item-id="' + canon('Apple') + '"]').length;
         injectAssistant('You see another [Apple].');
         await tick();
-        const after = document.querySelectorAll('.rpg-item[data-item-id="'+canon('Apple')+'"]').length;
+        const after = document.querySelectorAll('.rpg-item[data-item-id="' + canon('Apple') + '"]').length;
         assert(after === beforeCount + 1, 'Exactly one new span added (no nesting)');
+        step++;
+
+        /* 13 – fuzzy phrase match */
+        CoreState.setScene([canon('SkullMug')]);
+        injectAssistant('You lift a warm skull mug from the shelf.');
+        await tick();
+        const skull = document.querySelector('.rpg-item.scene[data-item-id="' + canon('SkullMug') + '"]');
+        assert(skull, 'Fuzzy phrase should map to SkullMug');
         step++;
 
         assert(
             fails.length === 0,
-            'No test steps should have failed'
+            'No test steps should have failed',
         );
     }catch(err){
         console.error(err);
@@ -279,35 +415,37 @@ const setStrict = flag => {
         for(const [ev,fn] of Object.entries(handlers)) window.removeEventListener(ev, fn);
     }
 
-    assistantBubble(`*Tagger self-test: ${pass} / 12 checks passed${fails.length ? ' — failed: '+fails.join(', ') : ' ✔️'}*`);
+    assistantBubble(`*Tagger self-test: ${pass} / 13 checks passed${fails.length ? ' — failed: ' + fails.join(', ') : ' ✔️'}*`);
     return '';
 }
 
 (function init(){
     if(!settings.enabled) return;
     injectCss();
+    refreshAliasMap();
     highlightAll();
     recolorAll();
     eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, onMessageRendered);
-    window.addEventListener('sceneUpdate', recolorAll);
+    window.addEventListener('sceneUpdate', () => { refreshAliasMap(); recolorAll(); });
     window.addEventListener('itemAdd', recolorAll);
     window.addEventListener('itemRemove', recolorAll);
-    window.addEventListener('stateReset', recolorAll);
+    window.addEventListener('stateReset', () => { cachedSynonyms = {}; refreshAliasMap(); recolorAll(); });
     new MutationObserver(muts=>{
         muts.forEach(m=>{
             m.addedNodes.forEach(node=>{
-                if(node.nodeType!==1) return;
+                if(node.nodeType !== 1) return;
                 if(!node.classList?.contains('mes')) return;
-                if(node.getAttribute('is_user')==='true') return;
-                const tgt=node.querySelector('.mes_text')||node;
+                if(node.getAttribute('is_user') === 'true') return;
+                const tgt = node.querySelector('.mes_text') || node;
                 setTimeout(() => {
                     autoBracket(tgt);
                     tagElement(tgt);
+                    fuzzyHighlightElement(tgt);
                     recolorAll();
                 }, 0);
             });
         });
-    }).observe(document.body,{childList:true,subtree:true});
+    }).observe(document.body,{ childList:true,subtree:true });
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name:'tagger-selftest',
         callback: runSelfTest,
