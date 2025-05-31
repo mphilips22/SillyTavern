@@ -31,17 +31,29 @@ function tokeniseID(id){
         .filter(Boolean);
 }
 
+function camelToDisplay(id){
+    const txt = String(id || '')
+        .replace(/([a-z])([A-Z0-9])/g, '$1 $2')
+        .replace(/([0-9])([a-zA-Z])/g, '$1 $2')
+        .replace(/[_-]+/g, ' ')
+        .trim()
+        .replace(/\s+/g, ' ');
+    return txt.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
 function buildAliasMap(sceneIds = []){
     const map = {};
     for(const raw of sceneIds){
         const id = canon(raw);
-        const tokens = tokeniseID(raw);
-        if(!tokens.length) continue;
-        const phrase = tokens.join(' ');
+        const display = camelToDisplay(raw);
+        if(!display) continue;
+        const phrase = display.toLowerCase();
+        const tokens = phrase.split(/\s+/);
         const last = tokens[tokens.length - 1];
         map[phrase] = id;
+        map[phrase.replace(/\s+/g,'')] = id;
         if(!map[last]) map[last] = id;
-        map[id] = id;
+        map[id.toLowerCase()] = id;
     }
     return map;
 }
@@ -152,9 +164,11 @@ function fuzzyHighlightElement(el){
         for(const span of spans){
             let clean = stripAdj(span.text.toLowerCase());
             if(!clean) continue;
-            let id = aliasMap[clean];
+            let id = aliasMap[clean] || aliasMap[clean.replace(/\s+/g,'')];
             if(id && done.has(id)) continue;
-            if(!id){
+            if(id){
+                // exact match, no fuzzy check needed
+            }else{
                 for(const [alias,aid] of Object.entries(aliasMap)){
                     if(done.has(aid)) continue;
                     const { dist,ratio } = distance(clean, alias);
@@ -404,6 +418,15 @@ async function runSelfTest(){
         assert(skull, 'Fuzzy phrase should map to SkullMug');
         step++;
 
+        /* 14 – natural-name phrase match */
+        CoreState.setScene([canon('CookingPot'), canon('WeatheredCrate')]);
+        injectAssistant('You lift the cooking pot and set it by the weathered crate.');
+        await tick();
+        const pot = document.querySelector('.rpg-item.scene[data-item-id="' + canon('CookingPot') + '"]');
+        const crate = document.querySelector('.rpg-item.scene[data-item-id="' + canon('WeatheredCrate') + '"]');
+        assert(pot && crate, 'Natural phrases should map to CookingPot and WeatheredCrate');
+        step++;
+
         assert(
             fails.length === 0,
             'No test steps should have failed',
@@ -415,7 +438,7 @@ async function runSelfTest(){
         for(const [ev,fn] of Object.entries(handlers)) window.removeEventListener(ev, fn);
     }
 
-    assistantBubble(`*Tagger self-test: ${pass} / 13 checks passed${fails.length ? ' — failed: ' + fails.join(', ') : ' ✔️'}*`);
+    assistantBubble(`*Tagger self-test: ${pass} / 14 checks passed${fails.length ? ' — failed: ' + fails.join(', ') : ' ✔️'}*`);
     return '';
 }
 
