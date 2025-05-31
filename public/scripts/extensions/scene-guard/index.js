@@ -35,7 +35,6 @@ const inject = window.SillyTavern?.injectAssistant
     ctx.extensionSettings.features ??= {};
     ctx.extensionSettings.features.sceneguard ??= { enabled: true };
     const settings = ctx.extensionSettings.features.sceneguard;
-    let lastHadScene = true;
     let errorNode = null;
 
     function canon(id){
@@ -159,7 +158,6 @@ function showWarn(id, text){
                 showWarn(id, '⚠ Scene list stale — resend with setScene.');
             }
         }
-        lastHadScene = foundScene;
     }
 
 
