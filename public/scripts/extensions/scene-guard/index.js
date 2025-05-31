@@ -5,6 +5,7 @@ import * as CoreState from '../core-state/index.js';
 
 let pendingAF = 0; // requestAnimationFrame debounce id
 let missCount = 0;            // consecutive invalid turns
+let pendingItems = [];        // awaiting visible scene items
 
 const inject = window.SillyTavern?.injectAssistant
             || window.ST?.injectAssistant
@@ -137,6 +138,21 @@ function showWarn(id, text){
                     if(!re.test(search)) missing.push(it);
                 }
             }
+        } else if(pendingItems.length){
+            foundScene = true;
+            const clone = node.cloneNode(true);
+            hiddenNodes.forEach(n=>{
+                 const target = Array.from(clone.querySelectorAll('div[style]'))
+                .find(el => el.style.display === 'none');
+                if(target) target.remove();
+            });
+            const search = stripHtml(clone.innerHTML);
+            for(const it of pendingItems){
+                const esc = it.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+                const re = new RegExp(`\\[\\s*${esc}\\s*\\]`,`i`);
+                if(!re.test(search)) missing.push(it);
+            }
+            pendingItems = [];
         }
         if(!foundScene && hasCtrl){
             foundScene = true;
@@ -213,6 +229,11 @@ missCount = 0;  // start the streak from scratch
 
     function init(){
         const chatBox = document.getElementById('chat');
+        window.addEventListener('sceneUpdate', e => {
+            pendingItems = (e.detail?.items || []).map(canon);
+            missCount = 0;
+            removeWarn();
+        });
         window.addEventListener('stateReset', () => { missCount = 0; removeWarn(); });
         eventSource.on(event_types.CHAT_CHANGED, () => {
             missCount = 0;
