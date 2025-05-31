@@ -113,8 +113,7 @@ function showWarn(id, text){
         if(!id) return;
         const msg = ctx.chat?.[id];
         if(!msg || msg.is_user || msg.is_system) return;
-        const hiddenNodes = [...node.querySelectorAll('.mes_text div[style]')]
-                    .filter(el => el.style.display === 'none');
+        const hiddenNodes = [...node.querySelectorAll('.mes_text div[hidden]')];
         const hasCtrl = hiddenNodes.some(d => /::\s*setScene/i.test(d.textContent));
         const hidden = hiddenNodes.map(n=>n.textContent.trim()).reverse().find(t => /::\s*setScene/i.test(t));
         let foundScene = false;
@@ -123,9 +122,8 @@ function showWarn(id, text){
         let search = '';
         if(hidden || pendingItems.length){
             const clone = node.cloneNode(true);
-            hiddenNodes.forEach(n => {
-                const target = Array.from(clone.querySelectorAll('div[style]'))
-                    .find(el => el.style.display === 'none');
+            hiddenNodes.forEach(() => {
+                const target = clone.querySelector('div[hidden]');
                 if (target) target.remove();
             });
             search = stripHtml(clone.innerHTML);
@@ -188,7 +186,7 @@ function showWarn(id, text){
 
         const sendTurn = (hidden, visible) => {
             inject(
-                `<div style="display:none">${hidden}</div>${visible}`,
+                `<div hidden>${hidden}</div>${visible}`,
                 { name: 'SelfTest', italic: true }
             );
         };
