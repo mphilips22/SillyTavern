@@ -218,6 +218,8 @@ missCount = 0;  // start the streak from scratch
             missCount = 0;
             removeWarn();
         });
+        eventSource.on(event_types.CHAT_CREATED, CoreState.clearState);
+        eventSource.on(event_types.GROUP_CHAT_CREATED, CoreState.clearState);
         if(chatBox){
             new MutationObserver(muts => {
                 muts.forEach(m => {
