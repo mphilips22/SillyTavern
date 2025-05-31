@@ -532,12 +532,14 @@ async function runSelfTest(){
         step++;
 
         /* 16 – ::obj parsing with strength gating */
-        const packet = [
+        const cmds = [
             '::obj id=CookingPot name="cooking pot" carryReq=5',
             '::obj id=HeavyDoor name="oak door" carryReq=18',
             '::setScene CookingPot HeavyDoor',
-        ].join('\n');
-        const mid = injectAssistant(packet + '\nYou lift the cooking pot but the oak door won\u2019t budge.');
+        ];
+        const hidden = cmds.map(c => `<div style="display:none">${c}</div>`).join('');
+        const packet = hidden + 'You lift the cooking pot but the oak door won\u2019t budge.';
+        const mid = injectAssistant(packet);
         await tick();
         const pot2 = document.querySelector(`#chat [mesid="${mid}"] .rpg-item[data-item-id="${canon('CookingPot')}"]`);
         assert(pot2, 'Cooking pot should highlight with STR 10');
