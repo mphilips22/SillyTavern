@@ -214,6 +214,12 @@ missCount = 0;  // start the streak from scratch
     function init(){
         const chatBox = document.getElementById('chat');
         window.addEventListener('stateReset', () => { missCount = 0; removeWarn(); });
+        eventSource.on(event_types.CHAT_CHANGED, () => {
+            missCount = 0;
+            removeWarn();
+        });
+        eventSource.on(event_types.CHAT_CREATED, CoreState.clearState);
+        eventSource.on(event_types.GROUP_CHAT_CREATED, CoreState.clearState);
         if(chatBox){
             new MutationObserver(muts => {
                 muts.forEach(m => {
