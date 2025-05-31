@@ -15,6 +15,7 @@ function canon(label){
 }
 
 const ADJ_STOP = ['warm','old','shiny','ancient','rusty','broken','cold','small','large'];
+const STOP_SINGLE = ['a','the','you','to','of','in','on','it'];
 
 function stripAdj(text){
     const parts = text.trim().split(/\s+/);
@@ -22,6 +23,7 @@ function stripAdj(text){
     return parts.join(' ');
 }
 
+// eslint-disable-next-line no-unused-vars
 function tokeniseID(id){
     return String(id || '')
         .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -41,6 +43,38 @@ function camelToDisplay(id){
     return txt.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
+function parseItems(str){
+    if(!str) return [];
+    const clean = str.replace(/^\[|\]$/g,'');
+    return clean.split(',').map(s=>s.trim()).filter(Boolean);
+}
+
+function parseCommands(line){
+    if(!line.startsWith('::')) return [];
+    const raw = line.slice(2).trim();
+    const parts = raw.split(';').map(p=>p.trim()).filter(Boolean);
+    const cmds = [];
+    for(const part of parts){
+        const m = /^(\w+)\s*(.*)$/.exec(part);
+        if(!m) continue;
+        const verb = m[1];
+        const argStr = m[2];
+        const args = {};
+        const re = /(\w+)=((?:"[^"]*"|'[^']*'|\[[^\]]*\]|\S+))/g;
+        let match;
+        while((match = re.exec(argStr)) !== null){
+            let val = match[2];
+            if((val.startsWith('"') && val.endsWith('"')) || (val.startsWith('\'') && val.endsWith('\''))){
+                val = val.slice(1,-1);
+            }
+            val = val.replace(/<[^>]*>/g,'');
+            args[match[1]] = val;
+        }
+        cmds.push({ verb, args });
+    }
+    return cmds;
+}
+
 function buildAliasMap(sceneIds = []){
     const map = {};
     for(const raw of sceneIds){
@@ -52,7 +86,9 @@ function buildAliasMap(sceneIds = []){
         const last = tokens[tokens.length - 1];
         map[phrase] = id;
         map[phrase.replace(/\s+/g,'')] = id;
-        if(!map[last]) map[last] = id;
+        if(last.length >= 4 && !STOP_SINGLE.includes(last) && !map[last]) {
+            map[last] = id;
+        }
         map[id.toLowerCase()] = id;
     }
     return map;
@@ -94,6 +130,7 @@ function distance(a,b){
 
 let aliasMap = {};
 let cachedSynonyms = {};
+let aliasMapReady = false;
 
 function cacheSyn(id, phrase){
     cachedSynonyms[phrase] = id;
@@ -164,11 +201,18 @@ function fuzzyHighlightElement(el){
         for(const span of spans){
             let clean = stripAdj(span.text.toLowerCase());
             if(!clean) continue;
+            const tokens = clean.split(/\s+/);
+            const isSingle = tokens.length === 1;
+            if(isSingle){
+                const token = tokens[0];
+                if(token.length < 4) continue;
+                if(STOP_SINGLE.includes(token)) continue;
+            }
             let id = aliasMap[clean] || aliasMap[clean.replace(/\s+/g,'')];
             if(id && done.has(id)) continue;
             if(id){
                 // exact match, no fuzzy check needed
-            }else{
+            }else if(!isSingle){
                 for(const [alias,aid] of Object.entries(aliasMap)){
                     if(done.has(aid)) continue;
                     const { dist,ratio } = distance(clean, alias);
@@ -202,6 +246,15 @@ function highlightAll(){
         tagElement(el);
         fuzzyHighlightElement(el);
     });
+}
+
+function reScanMessage(root){
+    if(!root || root.__taggerRescanned) return;
+    root.__taggerRescanned = true;
+    const el = root.querySelector('.mes_text') || root;
+    autoBracket(el);
+    tagElement(el);
+    fuzzyHighlightElement(el);
 }
 
 function setsFromState(){
@@ -427,6 +480,14 @@ async function runSelfTest(){
         assert(pot && crate, 'Natural phrases should map to CookingPot and WeatheredCrate');
         step++;
 
+        /* 15 – stop-words filtered */
+        const base = document.querySelectorAll('.rpg-item').length;
+        injectAssistant('A battered cooking pot sits on the wooden table.');
+        await tick();
+        const afterAll = document.querySelectorAll('.rpg-item').length;
+        assert(afterAll === base + 2, 'Cooking pot & wooden table highlighted; "A" ignored');
+        step++;
+
         assert(
             fails.length === 0,
             'No test steps should have failed',
@@ -438,7 +499,7 @@ async function runSelfTest(){
         for(const [ev,fn] of Object.entries(handlers)) window.removeEventListener(ev, fn);
     }
 
-    assistantBubble(`*Tagger self-test: ${pass} / 14 checks passed${fails.length ? ' — failed: ' + fails.join(', ') : ' ✔️'}*`);
+    assistantBubble(`*Tagger self-test: ${pass} / 15 checks passed${fails.length ? ' — failed: ' + fails.join(', ') : ' ✔️'}*`);
     return '';
 }
 
@@ -460,6 +521,24 @@ async function runSelfTest(){
                 if(!node.classList?.contains('mes')) return;
                 if(node.getAttribute('is_user') === 'true') return;
                 const tgt = node.querySelector('.mes_text') || node;
+                const hidden = [...tgt.querySelectorAll('div[style]')]
+                    .filter(el => el.style.display === 'none')
+                    .map(n => n.textContent.trim())
+                    .find(t => /^::\s*setScene/i.test(t));
+                if(hidden){
+                    const cmds = parseCommands(hidden);
+                    const scene = cmds.find(c => c.verb === 'setScene');
+                    if(scene){
+                        const items = parseItems(scene.args.items || scene.args.item)
+                            .map(canon);
+                        aliasMap = buildAliasMap(items);
+                        aliasMap = Object.assign({}, aliasMap, cachedSynonyms);
+                        aliasMapReady = true;
+                        reScanMessage(node);
+                        return;
+                    }
+                }
+                if(!aliasMapReady) return;
                 setTimeout(() => {
                     autoBracket(tgt);
                     tagElement(tgt);
