@@ -537,7 +537,7 @@ async function runSelfTest(){
             '::obj id=HeavyDoor name="oak door" carryReq=18',
             '::setScene CookingPot HeavyDoor',
         ];
-        const hidden = cmds.map(c => `<div style="display:none">${c}</div>`).join('');
+        const hidden = cmds.map(c => `<div hidden>${c}</div>`).join('');
         const packet = hidden + 'You lift the cooking pot but the oak door won\u2019t budge.';
         const mid = injectAssistant(packet);
         await tick();
@@ -583,8 +583,7 @@ async function runSelfTest(){
                 if(!node.classList?.contains('mes')) return;
                 if(node.getAttribute('is_user') === 'true') return;
                 const tgt = node.querySelector('.mes_text') || node;
-                const hiddenLines = [...tgt.querySelectorAll('div[style]')]
-                    .filter(el => el.style.display === 'none')
+                const hiddenLines = [...tgt.querySelectorAll('div[hidden]')]
                     .map(n => n.textContent.trim());
                 if(hiddenLines.length){
                     const objs = [];
