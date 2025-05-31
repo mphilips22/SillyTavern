@@ -64,8 +64,9 @@ function parseCommands(line){
         let match;
         while((match = re.exec(argStr)) !== null){
             let val = match[2];
-            if((val.startsWith('"') && val.endsWith('"')) || (val.startsWith('\'') && val.endsWith('\''))){
-                val = val.slice(1,-1);
+            if ((val.startsWith('"') && val.endsWith('"')) ||
+                (val.startsWith("'") && val.endsWith("'"))) {
+                val = val.slice(1, -1);
             }
             val = val.replace(/<[^>]*>/g,'');
             args[match[1]] = val;
