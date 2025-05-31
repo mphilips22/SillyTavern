@@ -415,6 +415,8 @@ function processHiddenLine(line){
     }
 }
 
+// Parse rulevault commands before the message is displayed.
+// HP/MP shorthand tags are handled later in onMessageRendered.
 function onMessage(id){
     const mes = chat?.[id];
     if(!mes || mes.is_user || mes.is_system) return;
@@ -460,31 +462,14 @@ function onMessage(id){
     mes.mes = newText;
     if('mes_html' in mes) mes.mes_html = newText;
 
-    if(node && hiddenNodes.length){
-        const msgText = newText;
-        const hpRegex = /\bHP\s*([+-]\d+)/gi;
-        const mpRegex = /\bMP\s*([+-]\d+)/gi;
-        const hpList = [...msgText.matchAll(hpRegex)].map(m => parseInt(m[1], 10));
-        const mpList = [...msgText.matchAll(mpRegex)].map(m => parseInt(m[1], 10));
-        const lastHidden = hiddenNodes[hiddenNodes.length - 1];
-
-        if(hpList.length && !/::modHP\b/.test(hiddenText)){
-            const total = hpList.reduce((a,b)=>a+b,0);
-            lastHidden.textContent += `\n::modHP target=${personaName()} amount=${total}`;
-            CoreState.modHP(personaName(), total);
-        }
-
-        if(mpList.length && !/::modMP\b/.test(hiddenText)){
-            const total = mpList.reduce((a,b)=>a+b,0);
-            lastHidden.textContent += `\n::modMP target=${personaName()} amount=${total}`;
-            CoreState.modMP(personaName(), total);
-        }
-    }
+    // HP/MP adjustments are handled in onMessageRendered once the DOM
+    // nodes exist. Only command parsing occurs here.
 }
 
 // HP/MP adjustments require access to the rendered DOM nodes.
-// MESSAGE_RECEIVED fires before the message HTML exists, so we also
-// listen for CHARACTER_MESSAGE_RENDERED and process the text again.
+// onMessage parses commands before rendering, but the DOM isn't ready
+// until CHARACTER_MESSAGE_RENDERED. Process the message again here so
+// any HP/MP shorthand tags can be applied.
 function onMessageRendered(id){
     const node = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     if(!node) return;
