@@ -96,22 +96,30 @@ function parseCommands(line){
     return cmds;
 }
 
-function buildAliasMap(sceneIds = []){
+function buildAliasMap(objs = []){
     const map = {};
-    for(const raw of sceneIds){
-        const id = canon(raw);
+    for(const obj of objs){
+        const id = canon(obj.id);
         if(!id) continue;
-        let tokens = splitCanonicalTokens(raw);
-        const phrase = tokens.join(' ').toLowerCase();
-        const last = tokens[tokens.length - 1];
-        if(phrase) {
-            map[phrase] = id;
-            map[phrase.replace(/\s+/g,'')] = id;
+        const carryReq = Number(obj.carryReq) || 0;
+        const aliasSet = new Set();
+        for(const raw of [obj.id, obj.name]){
+            if(!raw) continue;
+            const tokens = splitCanonicalTokens(raw);
+            const phrase = tokens.join(' ').toLowerCase();
+            const last = tokens[tokens.length - 1];
+            if(phrase){
+                aliasSet.add(phrase);
+                aliasSet.add(phrase.replace(/\s+/g,''));
+            }
+            if(last && last.length >= 4 && !STOP_SINGLE.includes(last)){
+                aliasSet.add(last.toLowerCase());
+            }
         }
-        if(last && last.length >= 4 && !STOP_SINGLE.includes(last) && !map[last]) {
-            map[last] = id;
+        aliasSet.add(id.toLowerCase());
+        for(const a of aliasSet){
+            if(!map[a]) map[a] = { id, carryReq };
         }
-        map[id.toLowerCase()] = id;
     }
     return map;
 }
@@ -153,14 +161,17 @@ function distance(a,b){
 let aliasMap = {};
 let cachedSynonyms = {};
 let aliasMapReady = false;
+let doneIds = new Set();
 
-function cacheSyn(id, phrase){
-    cachedSynonyms[phrase] = id;
-    aliasMap[phrase] = id;
+function cacheSyn(id, phrase, carryReq = 0){
+    cachedSynonyms[phrase] = { id, carryReq };
+    aliasMap[phrase] = { id, carryReq };
 }
 
 function refreshAliasMap(){
-    aliasMap = buildAliasMap(CoreState.getState().sceneObjects || []);
+    const scene = CoreState.getState().sceneObjects || [];
+    const objs = scene.map(id => ({ id, name: id, carryReq: 0 }));
+    aliasMap = buildAliasMap(objs);
     aliasMap = Object.assign({}, aliasMap, cachedSynonyms);
 }
 
@@ -216,7 +227,8 @@ function fuzzyHighlightElement(el){
             return NodeFilter.FILTER_ACCEPT;
         },
     });
-    const done = new Set();
+    doneIds.clear();
+    const playerSTR = CoreState?.stats?.strength ?? 10;
     for(let node = walker.nextNode(); node;){
         const text = node.nodeValue;
         const spans = [...ngramSpans(text)];
@@ -231,35 +243,34 @@ function fuzzyHighlightElement(el){
                 if(token.length < 4) continue;
                 if(STOP_SINGLE.includes(token)) continue;
             }
-            let id = aliasMap[clean] || aliasMap[clean.replace(/\s+/g,'')];
-            if(id && done.has(id)) continue;
-            if(id){
+            let obj = aliasMap[clean] || aliasMap[clean.replace(/\s+/g,'')];
+            if(obj && doneIds.has(obj.id)) continue;
+            if(obj && playerSTR < obj.carryReq) obj = null;
+            if(obj){
                 // exact match, no fuzzy check needed
             }else if(!isSingle){
-                for(const [alias,aid] of Object.entries(aliasMap)){
-                    if(done.has(aid)) continue;
+                for(const [alias,info] of Object.entries(aliasMap)){
+                    if(doneIds.has(info.id)) continue;
+                    if(playerSTR < info.carryReq) continue;
                     const { dist,ratio } = distance(clean, alias);
                     if(dist <= 2 || ratio >= 0.9){
-                        id = aid;
-                        cacheSyn(aid, clean);
+                        obj = info;
+                        cacheSyn(info.id, clean, info.carryReq);
                         break;
                     }
                 }
             }
-            if(id){
-                const frag = document.createDocumentFragment();
-                frag.appendChild(document.createTextNode(text.slice(0, span.start)));
+            if(obj){
+                const range = document.createRange();
+                range.setStart(node, span.start);
+                range.setEnd(node, span.end);
                 const sp = document.createElement('span');
                 sp.className = 'rpg-item scene';
-                sp.dataset.itemId = id;
-                sp.textContent = text.slice(span.start, span.end);
-                frag.appendChild(sp);
-                const after = document.createTextNode(text.slice(span.end));
-                frag.appendChild(after);
-                node.replaceWith(frag);
-                done.add(id);
-                walker.currentNode = after;
-                node = after;
+                sp.dataset.itemId = obj.id;
+                range.surroundContents(sp);
+                doneIds.add(obj.id);
+                walker.currentNode = sp.nextSibling;
+                node = walker.currentNode;
                 replaced = true;
                 break;
             }
@@ -281,6 +292,7 @@ function highlightAll(){
 function reScanMessage(root){
     if(!root || root.__taggerRescanned) return;
     root.__taggerRescanned = true;
+    doneIds.clear();
     const el = root.querySelector('.mes_text') || root;
     autoBracket(el);
     tagElement(el);
@@ -519,6 +531,23 @@ async function runSelfTest(){
         assert(afterAll === base + 2, 'Cooking pot & wooden table highlighted; "A" ignored');
         step++;
 
+        /* 16 – ::obj parsing with strength gating */
+        const packet = [
+            '::obj id=CookingPot name="cooking pot" carryReq=5',
+            '::obj id=HeavyDoor name="oak door" carryReq=18',
+            '::setScene CookingPot HeavyDoor',
+        ].join('\n');
+        const mid = injectAssistant(packet + '\nYou lift the cooking pot but the oak door won\u2019t budge.');
+        await tick();
+        const pot2 = document.querySelector(`#chat [mesid="${mid}"] .rpg-item[data-item-id="${canon('CookingPot')}"]`);
+        assert(pot2, 'Cooking pot should highlight with STR 10');
+        step++;
+
+        /* 17 – door fails strength check */
+        const door2 = document.querySelector(`#chat [mesid="${mid}"] .rpg-item[data-item-id="${canon('HeavyDoor')}"]`);
+        assert(!door2, 'Oak door should not highlight when carryReq unmet');
+        step++;
+
         assert(
             fails.length === 0,
             'No test steps should have failed',
@@ -530,7 +559,7 @@ async function runSelfTest(){
         for(const [ev,fn] of Object.entries(handlers)) window.removeEventListener(ev, fn);
     }
 
-    assistantBubble(`*Tagger self-test: ${pass} / 15 checks passed${fails.length ? ' — failed: ' + fails.join(', ') : ' ✔️'}*`);
+    assistantBubble(`*Tagger self-test: ${pass} / 17 checks passed${fails.length ? ' — failed: ' + fails.join(', ') : ' ✔️'}*`);
     return '';
 }
 
@@ -552,21 +581,28 @@ async function runSelfTest(){
                 if(!node.classList?.contains('mes')) return;
                 if(node.getAttribute('is_user') === 'true') return;
                 const tgt = node.querySelector('.mes_text') || node;
-                const hidden = [...tgt.querySelectorAll('div[style]')]
+                const hiddenLines = [...tgt.querySelectorAll('div[style]')]
                     .filter(el => el.style.display === 'none')
-                    .map(n => n.textContent.trim())
-                    .find(t => /^::\s*setScene/i.test(t));
-                if(hidden){
-                    const cmds = parseCommands(hidden);
-                    const scene = cmds.find(c => c.verb === 'setScene');
-                    if(scene){
-                        const items = parseItems(scene.args.items || scene.args.item)
-                            .map(canon);
-                        aliasMap = buildAliasMap(items);
-                        aliasMap = Object.assign({}, aliasMap, cachedSynonyms);
-                        aliasMapReady = true;
-                        reScanMessage(node);
-                        return;
+                    .map(n => n.textContent.trim());
+                if(hiddenLines.length){
+                    const objs = [];
+                    for(const line of hiddenLines){
+                        const cmds = parseCommands(line);
+                        for(const cmd of cmds){
+                            if(cmd.verb === 'obj'){
+                                objs.push({
+                                    id: cmd.args.id,
+                                    name: cmd.args.name || cmd.args.id,
+                                    carryReq: cmd.args.carryReq,
+                                });
+                            }else if(cmd.verb === 'setScene'){
+                                aliasMap = buildAliasMap(objs);
+                                aliasMap = Object.assign({}, aliasMap, cachedSynonyms);
+                                aliasMapReady = true;
+                                reScanMessage(node);
+                                return;
+                            }
+                        }
                     }
                 }
                 if(!aliasMapReady) return;
