@@ -141,38 +141,49 @@ function* ngramSpans(text, max = 3){
     }
 }
 
-function distance(a,b){
-    if(a === b) return { dist:0,ratio:1 };
-    const la = a.length, lb = b.length;
-    const dp = new Array(la + 1);
-    for(let i = 0;i <= la;i++){dp[i] = new Array(lb + 1);dp[i][0] = i;}
-    for(let j = 1;j <= lb;j++) dp[0][j] = j;
-    for(let i = 1;i <= la;i++){
-        for(let j = 1;j <= lb;j++){
-            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-            dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
-        }
-    }
-    const dist = dp[la][lb];
-    const ratio = 1 - dist / Math.max(la,lb);
-    return { dist,ratio };
+// function distance(a,b){
+//     if(a === b) return { dist:0,ratio:1 };
+//     const la = a.length, lb = b.length;
+//     const dp = new Array(la + 1);
+//     for(let i = 0;i <= la;i++){dp[i] = new Array(lb + 1);dp[i][0] = i;}
+//     for(let j = 1;j <= lb;j++) dp[0][j] = j;
+//     for(let i = 1;i <= la;i++){
+//         for(let j = 1;j <= lb;j++){
+//             const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+//             dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+//         }
+//     }
+//     const dist = dp[la][lb];
+//     const ratio = 1 - dist / Math.max(la,lb);
+//     return { dist,ratio };
+// }
+
+function nearMatch(a,b){
+    if(a === b) return true;
+    if(a.length < 5 || b.length < 5) return false;
+    const trig = s => new Set(s.match(/.../g) || []);
+    const A = trig(a), B = trig(b);
+    const inter = [...A].filter(x => B.has(x)).length;
+    const sim = inter / Math.max(A.size, B.size);
+    return sim > 0.9;
 }
 
-let aliasMap = {};
+let aliasMapCurrent = {};
+let aliasMapNext = {};
+let aliasReady = true;
 let cachedSynonyms = {};
-let aliasMapReady = false;
 let doneIds = new Set();
 
 function cacheSyn(id, phrase, carryReq = 0){
     cachedSynonyms[phrase] = { id, carryReq };
-    aliasMap[phrase] = { id, carryReq };
+    aliasMapCurrent[phrase] = { id, carryReq };
 }
 
 function refreshAliasMap(){
     const scene = CoreState.getState().sceneObjects || [];
     const objs = scene.map(id => ({ id, name: id, carryReq: 0 }));
-    aliasMap = buildAliasMap(objs);
-    aliasMap = Object.assign({}, aliasMap, cachedSynonyms);
+    aliasMapCurrent = buildAliasMap(objs);
+    aliasMapCurrent = Object.assign({}, aliasMapCurrent, cachedSynonyms);
 }
 
 function injectCss(){
@@ -243,17 +254,16 @@ function fuzzyHighlightElement(el){
                 if(token.length < 4) continue;
                 if(STOP_SINGLE.includes(token)) continue;
             }
-            let obj = aliasMap[clean] || aliasMap[clean.replace(/\s+/g,'')];
+            let obj = aliasMapCurrent[clean] || aliasMapCurrent[clean.replace(/\s+/g,'')];
             if(obj && doneIds.has(obj.id)) continue;
             if(obj && playerSTR < obj.carryReq) obj = null;
             if(obj){
                 // exact match, no fuzzy check needed
             }else if(!isSingle){
-                for(const [alias,info] of Object.entries(aliasMap)){
+                for(const [alias,info] of Object.entries(aliasMapCurrent)){
                     if(doneIds.has(info.id)) continue;
                     if(playerSTR < info.carryReq) continue;
-                    const { dist,ratio } = distance(clean, alias);
-                    if(dist <= 2 || ratio >= 0.9){
+                    if(nearMatch(clean, alias)){
                         obj = info;
                         cacheSyn(info.id, clean, info.carryReq);
                         break;
@@ -291,6 +301,7 @@ function highlightAll(){
 
 function reScanMessage(root){
     if(!root || root.__taggerRescanned) return;
+    if(!aliasReady) return;
     root.__taggerRescanned = true;
     doneIds.clear();
     const el = root.querySelector('.mes_text') || root;
@@ -597,16 +608,20 @@ async function runSelfTest(){
                                     carryReq: cmd.args.carryReq,
                                 });
                             }else if(cmd.verb === 'setScene'){
-                                aliasMap = buildAliasMap(objs);
-                                aliasMap = Object.assign({}, aliasMap, cachedSynonyms);
-                                aliasMapReady = true;
-                                reScanMessage(node);
+                                aliasMapNext = buildAliasMap(objs);
+                                aliasMapNext = Object.assign({}, aliasMapNext, cachedSynonyms);
+                                aliasReady = false;
+                                requestIdleCallback(() => {
+                                    aliasMapCurrent = aliasMapNext;
+                                    aliasReady = true;
+                                    reScanMessage(node);
+                                });
                                 return;
                             }
                         }
                     }
                 }
-                if(!aliasMapReady) return;
+                if(!aliasReady) return;
                 setTimeout(() => {
                     autoBracket(tgt);
                     tagElement(tgt);
