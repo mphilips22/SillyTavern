@@ -482,6 +482,42 @@ function onMessage(id){
     }
 }
 
+// HP/MP adjustments require access to the rendered DOM nodes.
+// MESSAGE_RECEIVED fires before the message HTML exists, so we also
+// listen for CHARACTER_MESSAGE_RENDERED and process the text again.
+function onMessageRendered(id){
+    const node = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
+    if(!node) return;
+
+    let hiddenNodes = [...node.querySelectorAll('div[hidden]')];
+    if(!hiddenNodes.length){
+        const div = document.createElement('div');
+        div.hidden = true;
+        node.appendChild(div);
+        hiddenNodes = [div];
+    }
+
+    const hiddenText = hiddenNodes.map(n => n.textContent).join('\n');
+    const msgText = node.innerText || '';
+    const hpRegex = /\bHP\s*([+-]\d+)/gi;
+    const mpRegex = /\bMP\s*([+-]\d+)/gi;
+    const hpList = [...msgText.matchAll(hpRegex)].map(m => parseInt(m[1], 10));
+    const mpList = [...msgText.matchAll(mpRegex)].map(m => parseInt(m[1], 10));
+    const lastHidden = hiddenNodes[hiddenNodes.length - 1];
+
+    if(hpList.length && !/::modHP\b/.test(hiddenText)){
+        const total = hpList.reduce((a,b)=>a+b,0);
+        lastHidden.textContent += `\n::modHP target=${personaName()} amount=${total}`;
+        CoreState.modHP(personaName(), total);
+    }
+
+    if(mpList.length && !/::modMP\b/.test(hiddenText)){
+        const total = mpList.reduce((a,b)=>a+b,0);
+        lastHidden.textContent += `\n::modMP target=${personaName()} amount=${total}`;
+        CoreState.modMP(personaName(), total);
+    }
+}
+
 async function runSmokeTest(){
     const events = { sceneUpdate:0, itemAdd:0, itemRemove:0 };
     const handlers = {
@@ -586,6 +622,10 @@ async function runSmokeTest(){
 
 function init(){
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessage);
+    // MESSAGE_RECEIVED fires before the DOM nodes exist. Listen for
+    // CHARACTER_MESSAGE_RENDERED so HP/MP shorthand tags can be processed
+    // once the message HTML is available.
+    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, onMessageRendered);
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'clearscene',
