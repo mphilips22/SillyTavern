@@ -155,7 +155,7 @@ function showWarn(id, text){
             removeWarn();
         } else {
             missCount++;
-            if (missCount >= 2 && !document.querySelector('.sceneguard-warn')) {
+            if (missCount >= 2) {
                 showWarn(id, '⚠ Scene list stale — resend with setScene.');
             }
         }
