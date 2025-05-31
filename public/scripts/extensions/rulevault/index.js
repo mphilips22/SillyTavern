@@ -161,7 +161,11 @@ function addSceneItem(item){
 
 function dropItem(target, item){
     const id = canon(item);
-    CoreState.removeItem(target, id);
+    const removed = removeInventoryItem(target, id);
+    if(!removed){
+        unknownItem(item);
+        return;
+    }
     addSceneItem(id);
 }
 
