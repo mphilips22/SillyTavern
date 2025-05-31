@@ -482,6 +482,7 @@ async function runSelfTest(){
         step++;
 
         /* 15 – stop-words filtered */
+        CoreState.setScene([canon('CookingPot'), canon('WoodenTable')]);
         const base = document.querySelectorAll('.rpg-item').length;
         injectAssistant('A battered cooking pot sits on the wooden table.');
         await tick();
