@@ -119,38 +119,37 @@ function showWarn(id, text){
         const hidden = hiddenNodes.map(n=>n.textContent.trim()).reverse().find(t => /::\s*setScene/i.test(t));
         let foundScene = false;
         let missing = [];
-        if(hidden){
-            const cmds = parseCommands(hidden);
-            const scene = cmds.find(c=>c.verb==='setScene');
-            if(scene){
-                foundScene = true;
-                const items = parseItems(scene.args.items);
-                const clone = node.cloneNode(true);
-                hiddenNodes.forEach(n=>{
-                     const target = Array.from(clone.querySelectorAll('div[style]'))
+        let canonicalLabels = new Set();
+        let search = '';
+        if(hidden || pendingItems.length){
+            const clone = node.cloneNode(true);
+            hiddenNodes.forEach(n => {
+                const target = Array.from(clone.querySelectorAll('div[style]'))
                     .find(el => el.style.display === 'none');
-                    if(target) target.remove();
-                });
-                const search = stripHtml(clone.innerHTML);
-                for(const it of items){
-                    const esc = it.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-                    const re = new RegExp(`\\[\\s*${esc}\\s*\\]`,`i`);
-                    if(!re.test(search)) missing.push(it);
+                if (target) target.remove();
+            });
+            search = stripHtml(clone.innerHTML);
+            const re = /\[([^\]]+)\]/g;
+            let match;
+            while ((match = re.exec(search)) !== null) {
+                canonicalLabels.add(canon(match[1]));
+            }
+        }
+
+        if (hidden) {
+            const cmds = parseCommands(hidden);
+            const scene = cmds.find(c => c.verb === 'setScene');
+            if (scene) {
+                foundScene = true;
+                const items = parseItems(scene.args.items).map(canon);
+                for (const it of items) {
+                    if (!canonicalLabels.has(it)) missing.push(it);
                 }
             }
-        } else if(pendingItems.length){
+        } else if (pendingItems.length) {
             foundScene = true;
-            const clone = node.cloneNode(true);
-            hiddenNodes.forEach(n=>{
-                 const target = Array.from(clone.querySelectorAll('div[style]'))
-                .find(el => el.style.display === 'none');
-                if(target) target.remove();
-            });
-            const search = stripHtml(clone.innerHTML);
-            for(const it of pendingItems){
-                const esc = it.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-                const re = new RegExp(`\\[\\s*${esc}\\s*\\]`,`i`);
-                if(!re.test(search)) missing.push(it);
+            for (const it of pendingItems) {
+                if (!canonicalLabels.has(it)) missing.push(it);
             }
             pendingItems = [];
         }
