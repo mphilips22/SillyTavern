@@ -1,0 +1,6 @@
+.system-bubble.sceneguard-warn {
+    color: var(--warning);
+    font-style: italic;
+    display: block;
+    margin: 4px 0;
+}
