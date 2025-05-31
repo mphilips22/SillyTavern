@@ -124,7 +124,7 @@ function* ngramSpans(text, max = 3){
         words.push({ word:m[0], index:m.index });
     }
     for(let i = 0;i < words.length;i++){
-        for(let n = 1;n <= max && i + n - 1 < words.length;n++){
+        for(let n = Math.min(max, words.length - i); n >= 1; n--){
             const start = words[i].index;
             const endWord = words[i + n - 1];
             const end = endWord.index + endWord.word.length;
