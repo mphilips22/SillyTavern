@@ -358,13 +358,14 @@ export async function runSelfTest() {
         'Initial stats valid'
     );
 
-    addXP(50);
+    // use gainXP() so the default player is targeted
+    gainXP(50);
     const after50 = getStats();
-    assert(after50.level === 1 && after50.xp === 50, 'addXP(50) adds XP but no level');
+    assert(after50.level === 1 && after50.xp === 50, 'gainXP(50) adds XP but no level');
 
-    addXP(150);
+    gainXP(150);
     const afterLevel = getStats();
-    assert(afterLevel.level === 2 && afterLevel.xp === 100, 'addXP(150) levels up');
+    assert(afterLevel.level === 2 && afterLevel.xp === 100, 'gainXP(150) levels up');
 
     const msg = `*CoreState self-test: ${pass}/3 checks passed${fails.length ? ' — failed: ' + fails.join(', ') + ' ❌' : ' ✔️'}*`;
     inject(msg, { name: 'SelfTest' });
