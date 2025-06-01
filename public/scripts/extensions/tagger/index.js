@@ -578,6 +578,9 @@ async function runSelfTest(){
         const packet = hidden + 'You lift the cooking pot but the oak door won\u2019t budge.';
         const mid = injectAssistant(packet);
         await tick();
+        while(!aliasReady){
+            await new Promise(r => requestIdleCallback(r));
+        }
         const pot2 = document.querySelector(`#chat [mesid="${mid}"] .rpg-item[data-item-id="${canon('CookingPot')}"]`);
         assert(pot2, 'Cooking pot should highlight with STR 10');
         step++;
@@ -670,8 +673,8 @@ async function runSelfTest(){
                         requestIdleCallback(() => {
                             aliasMapCurrent = aliasMapNext;
                             aliasReady = true;
-                            console.log("[Tagger] alias map swapped. New keys:", Object.keys(aliasMapCurrent));
-                            console.log("[Tagger] pendingNodes to rescan:", pendingNodes.size);
+                            console.log('[Tagger] alias map swapped. New keys:', Object.keys(aliasMapCurrent));
+                            console.log('[Tagger] pendingNodes to rescan:', pendingNodes.size);
 
                             const lookup = {};
                             for(const info of Object.values(aliasMapCurrent)){
@@ -703,11 +706,11 @@ async function runSelfTest(){
                 // exit early when the next alias map hasn't finished building.
                 // if(!aliasReady) return;
                 if(skipHighlight){
-                    console.log("[Tagger] queued node while aliasReady=false →", node.dataset?.mesid);
+                    console.log('[Tagger] queued node while aliasReady=false →', node.dataset?.mesid);
                     return;
                 }
                 setTimeout(() => {
-                    console.log("[Tagger] highlight pass with map keys:", Object.keys(aliasMapCurrent));
+                    console.log('[Tagger] highlight pass with map keys:', Object.keys(aliasMapCurrent));
                     autoBracket(tgt);
                     tagElement(tgt);
                     fuzzyHighlightElement(tgt);
