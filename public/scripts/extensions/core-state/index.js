@@ -1,6 +1,14 @@
 import { debounce } from '../../utils.js';
-import { eventSource, event_types } from '../../../script.js';
+import {
+    chat,
+    addOneMessage,
+    eventSource,
+    event_types,
+    system_message_types,
+} from '../../../script.js';
 import { getContext } from '../../extensions.js';
+import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
+import { SlashCommand } from '../../slash-commands/SlashCommand.js';
 
 /** @typedef {string[]} SceneArray */
 
@@ -15,8 +23,44 @@ export const playerName = ctx.character?.name || ctx.persona?.name || 'Player';
 let chatId = ctx.chat?.id || 'default';
 let STORAGE_KEY = `st.rpg.coreState.v1::${chatId}`;
 
+const inject = globalThis.SillyTavern?.injectAssistant
+    || globalThis.ST?.injectAssistant
+    || ((html, opts = {}) => {
+        const context = globalThis.SillyTavern?.getContext?.() ?? {};
+        const chatArr = context.chat || chat;
+        if (!Array.isArray(chatArr)) return;
+        const message = {
+            name: opts.name || 'SelfTest',
+            is_user: false,
+            is_system: false,
+            send_date: Date.now(),
+            mes: String(html),
+            extra: { type: system_message_types.ASSISTANT_MESSAGE },
+        };
+        chatArr.push(message);
+        const mid = chatArr.length - 1;
+        eventSource.emit(event_types.MESSAGE_RECEIVED, mid, 'extension');
+        addOneMessage(message);
+        eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, mid, 'extension');
+        context.saveChat?.();
+        return mid;
+    });
+
 function blankChar() {
-    return { hp: defaultMaxHp, max_hp: defaultMaxHp, mp: 0, max_mp: 100, inventory: [], buffs: {} };
+    return {
+        hp: defaultMaxHp,
+        max_hp: defaultMaxHp,
+        mp: 0,
+        max_mp: 100,
+        inventory: [],
+        buffs: {},
+        str: 0,
+        dex: 0,
+        vit: 0,
+        mind: 0,
+        level: 1,
+        xp: 0,
+    };
 }
 
 function defaultState() {
@@ -37,12 +81,50 @@ function loadState() {
 
 let state = loadState();
 
+function rollStat() {
+    let sum = 2;
+    for (let i = 0; i < 4; i++) sum += Math.floor(Math.random() * 4) + 1;
+    return sum;
+}
+
+function maybeInitStats() {
+    let changed = false;
+    for (const char of Object.values(state.characters)) {
+        if (!char.level) {
+            char.level = 1;
+            changed = true;
+        }
+        if (char.xp === undefined) {
+            char.xp = 0;
+            changed = true;
+        }
+        if (!char.str) {
+            char.str = rollStat();
+            changed = true;
+        }
+        if (!char.dex) {
+            char.dex = rollStat();
+            changed = true;
+        }
+        if (!char.vit) {
+            char.vit = rollStat();
+            changed = true;
+        }
+        if (!char.mind) {
+            char.mind = rollStat();
+            changed = true;
+        }
+    }
+    if (changed) persist();
+}
+
 function normalizeState() {
     state.characters = state.characters || {};
     state.clock = state.clock || { minute: 0 };
     state.sceneObjects = state.sceneObjects || [];
     state.meta = state.meta || { chatId, ver: 1 };
     if (!state.characters[playerName]) state.characters[playerName] = blankChar();
+    maybeInitStats();
 }
 
 normalizeState();
@@ -66,6 +148,19 @@ function ensureChar(target) {
 export function getState(target) {
     if (target) return JSON.parse(JSON.stringify(state.characters[target] || {}));
     return JSON.parse(JSON.stringify(state));
+}
+
+export function getStats(target) {
+    const name = target || playerName;
+    const c = state.characters[name] || {};
+    return {
+        str: c.str,
+        dex: c.dex,
+        vit: c.vit,
+        mind: c.mind,
+        level: c.level,
+        xp: c.xp,
+    };
 }
 
 export function modHP(target, delta, reason) {
@@ -148,6 +243,18 @@ export function removeItem(target, itemId) {
 
 export function advanceTime() { /* TODO */ }
 
+export async function runSelfTest() {
+    clearState();
+    await new Promise(r => requestAnimationFrame(r));
+    const stats = getStats();
+    const ok =
+        [stats.str, stats.dex, stats.vit, stats.mind].every(v => v >= 6 && v <= 18) &&
+        stats.level === 1 &&
+        stats.xp === 0;
+    inject(ok ? '*CoreState self-test passed ✔️*' : '*CoreState self-test failed ❌*', { name: 'SelfTest' });
+    return '';
+}
+
 function onChatChanged() {
     const context = getContext();
     chatId = context.chatId || 'default';
@@ -159,6 +266,7 @@ function onChatChanged() {
 eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
 
 window['getState'] = getState;
+window['getStats'] = getStats;
 window['modHP'] = modHP;
 window['clearState'] = clearState;
 window['snapshot'] = snapshot;
@@ -172,6 +280,7 @@ window['setSceneObjects'] = setScene;
 window['setDefaultMaxHp'] = setDefaultMaxHp;
 window['CoreState'] = {
     getState,
+    getStats,
     modHP,
     modMP,
     setScene,
@@ -181,10 +290,16 @@ window['CoreState'] = {
     clearState,
     snapshot,
     setDefaultMaxHp,
+    runSelfTest,
 };
 
-// Persist the initial state for the current chat
-persist();
+SlashCommandParser.addCommandObject(
+    SlashCommand.fromProps({
+        name: 'corestate-selftest',
+        callback: runSelfTest,
+        helpString: 'Run the CoreState self-test.',
+    }),
+);
 
 /* ===============================================================
    Dev smoke test – paste into browser console after reload
