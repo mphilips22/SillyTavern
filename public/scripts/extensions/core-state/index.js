@@ -44,6 +44,9 @@ const inject = globalThis.SillyTavern?.injectAssistant
 const xpNeeded = lvl => lvl * 100;
 
 // TODO: move this XP table to external JSON defaults
+// Player level progression still relies on xpNeeded(level) = level * 100.
+// The values below are only used for enemy reward amounts and do not
+// influence how a character levels up.
 export const ENEMY_XP = { E: 10, D: 25, C: 60, B: 120, A: 250, S: 500 };
 
 function blankChar() {
