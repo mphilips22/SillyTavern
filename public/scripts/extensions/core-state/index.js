@@ -14,7 +14,7 @@ import { SlashCommand } from '../../slash-commands/SlashCommand.js';
 
 
 const ctx = /** @type {any} */ (globalThis.SillyTavern?.getContext?.()) ?? {};
-export const playerName = ctx.character?.name || ctx.persona?.name || 'Player';
+export let playerName = ctx.character?.name || ctx.persona?.name || 'Player';
 let chatId = ctx.chat?.id || 'default';
 let STORAGE_KEY = `st.rpg.coreState.v1::${chatId}`;
 
@@ -376,10 +376,12 @@ export async function runSelfTest() {
 
 function onChatChanged() {
     const context = getContext();
+    playerName = context.character?.name || context.persona?.name || 'Player';
     chatId = context.chatId || 'default';
     STORAGE_KEY = `st.rpg.coreState.v1::${chatId}`;
     state = loadState();
     normalizeState();
+    globalThis.HUDPanel?.update?.();
 }
 
 eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
