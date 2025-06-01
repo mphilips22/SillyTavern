@@ -10,30 +10,11 @@ ctx.extensionSettings.features ??= {};
 ctx.extensionSettings.features.tagger ??= { enabled: true };
 const settings = ctx.extensionSettings.features.tagger;
 
-const idle = cb => (window.requestIdleCallback ? requestIdleCallback(cb) : setTimeout(cb, 0));
-
 function canon(label){
     return window.RuleVault?.canon?.(label) ?? String(label || '').toLowerCase().replace(/[^a-z0-9]/g,'');
 }
 
-const ADJ_STOP = [
-    'warm',
-    'old',
-    'shiny',
-    'ancient',
-    'rusty',
-    'broken',
-    'cold',
-    'small',
-    'large',
-    // articles and common descriptive adjectives
-    'a',
-    'an',
-    'the',
-    'battered',
-    'woolen',
-    'rough',
-];
+const ADJ_STOP = ['warm','old','shiny','ancient','rusty','broken','cold','small','large'];
 const STOP_SINGLE = ['a','the','you','to','of','in','on','it'];
 const COMMON_WORDS = [
     'skull', 'mug', 'cooking', 'pot', 'weathered', 'crate', 'wooden', 'table', 'fake', 'gem', 'apple',
@@ -110,7 +91,7 @@ function parseCommands(line){
             val = val.replace(/<[^>]*>/g,'');
             args[match[1]] = val;
         }
-        cmds.push({ verb, args, tail: argStr.trim() });
+        cmds.push({ verb, args });
     }
     return cmds;
 }
@@ -160,51 +141,38 @@ function* ngramSpans(text, max = 3){
     }
 }
 
-// function distance(a,b){
-//     if(a === b) return { dist:0,ratio:1 };
-//     const la = a.length, lb = b.length;
-//     const dp = new Array(la + 1);
-//     for(let i = 0;i <= la;i++){dp[i] = new Array(lb + 1);dp[i][0] = i;}
-//     for(let j = 1;j <= lb;j++) dp[0][j] = j;
-//     for(let i = 1;i <= la;i++){
-//         for(let j = 1;j <= lb;j++){
-//             const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-//             dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
-//         }
-//     }
-//     const dist = dp[la][lb];
-//     const ratio = 1 - dist / Math.max(la,lb);
-//     return { dist,ratio };
-// }
-
-function nearMatch(a,b){
-    if(a === b) return true;
-    if(a.length < 5 || b.length < 5) return false;
-    const trig = s => new Set(s.match(/.../g) || []);
-    const A = trig(a), B = trig(b);
-    const inter = [...A].filter(x => B.has(x)).length;
-    const sim = inter / Math.max(A.size, B.size);
-    return sim > 0.9;
+function distance(a,b){
+    if(a === b) return { dist:0,ratio:1 };
+    const la = a.length, lb = b.length;
+    const dp = new Array(la + 1);
+    for(let i = 0;i <= la;i++){dp[i] = new Array(lb + 1);dp[i][0] = i;}
+    for(let j = 1;j <= lb;j++) dp[0][j] = j;
+    for(let i = 1;i <= la;i++){
+        for(let j = 1;j <= lb;j++){
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+        }
+    }
+    const dist = dp[la][lb];
+    const ratio = 1 - dist / Math.max(la,lb);
+    return { dist,ratio };
 }
 
-let aliasMapCurrent = {};
-let aliasMapNext = {};
-let aliasReady = true;
-const pendingNodes = new Set();
+let aliasMap = {};
 let cachedSynonyms = {};
+let aliasMapReady = false;
 let doneIds = new Set();
 
 function cacheSyn(id, phrase, carryReq = 0){
     cachedSynonyms[phrase] = { id, carryReq };
-    aliasMapCurrent[phrase] = { id, carryReq };
+    aliasMap[phrase] = { id, carryReq };
 }
 
 function refreshAliasMap(){
     const scene = CoreState.getState().sceneObjects || [];
     const objs = scene.map(id => ({ id, name: id, carryReq: 0 }));
-    aliasMapCurrent = buildAliasMap(objs);
-    // drop stale cached synonyms so carry requirements stay in sync
-    cachedSynonyms = {};
+    aliasMap = buildAliasMap(objs);
+    aliasMap = Object.assign({}, aliasMap, cachedSynonyms);
 }
 
 function injectCss(){
@@ -266,32 +234,26 @@ function fuzzyHighlightElement(el){
         const spans = [...ngramSpans(text)];
         let replaced = false;
         for(const span of spans){
-            const raw = span.text.toLowerCase();
-            let clean = raw;
-            let obj = aliasMapCurrent[clean] || aliasMapCurrent[clean.replace(/\s+/g,'')];
-            let tokens = clean.split(/\s+/);
-            let isSingle = tokens.length === 1;
-            if(!obj){
-                clean = stripAdj(raw);
-                if(!clean) continue;
-                tokens = clean.split(/\s+/);
-                isSingle = tokens.length === 1;
-                if(isSingle){
-                    const token = tokens[0];
-                    if(token.length < 4) continue;
-                    if(STOP_SINGLE.includes(token)) continue;
-                }
-                obj = aliasMapCurrent[clean] || aliasMapCurrent[clean.replace(/\s+/g,'')];
+            let clean = stripAdj(span.text.toLowerCase());
+            if(!clean) continue;
+            const tokens = clean.split(/\s+/);
+            const isSingle = tokens.length === 1;
+            if(isSingle){
+                const token = tokens[0];
+                if(token.length < 4) continue;
+                if(STOP_SINGLE.includes(token)) continue;
             }
+            let obj = aliasMap[clean] || aliasMap[clean.replace(/\s+/g,'')];
             if(obj && doneIds.has(obj.id)) continue;
             if(obj && playerSTR < obj.carryReq) obj = null;
             if(obj){
                 // exact match, no fuzzy check needed
             }else if(!isSingle){
-                for(const [alias,info] of Object.entries(aliasMapCurrent)){
+                for(const [alias,info] of Object.entries(aliasMap)){
                     if(doneIds.has(info.id)) continue;
                     if(playerSTR < info.carryReq) continue;
-                    if(nearMatch(clean, alias)){
+                    const { dist,ratio } = distance(clean, alias);
+                    if(dist <= 2 || ratio >= 0.9){
                         obj = info;
                         cacheSyn(info.id, clean, info.carryReq);
                         break;
@@ -329,7 +291,6 @@ function highlightAll(){
 
 function reScanMessage(root){
     if(!root || root.__taggerRescanned) return;
-    if(!aliasReady) return;
     root.__taggerRescanned = true;
     doneIds.clear();
     const el = root.querySelector('.mes_text') || root;
@@ -576,13 +537,10 @@ async function runSelfTest(){
             '::obj id=HeavyDoor name="oak door" carryReq=18',
             '::setScene CookingPot HeavyDoor',
         ];
-        const hidden = cmds.map(c => `<div hidden>${c}</div>`).join('');
+        const hidden = cmds.map(c => `<div style="display:none">${c}</div>`).join('');
         const packet = hidden + 'You lift the cooking pot but the oak door won\u2019t budge.';
         const mid = injectAssistant(packet);
         await tick();
-        while(!aliasReady){
-            await new Promise(r => idle(r));
-        }
         const pot2 = document.querySelector(`#chat [mesid="${mid}"] .rpg-item[data-item-id="${canon('CookingPot')}"]`);
         assert(pot2, 'Cooking pot should highlight with STR 10');
         step++;
@@ -625,16 +583,11 @@ async function runSelfTest(){
                 if(!node.classList?.contains('mes')) return;
                 if(node.getAttribute('is_user') === 'true') return;
                 const tgt = node.querySelector('.mes_text') || node;
-                let skipHighlight = !aliasReady;
-                if(!aliasReady){
-                    pendingNodes.add(node);
-                }
-                const hiddenLines = [...tgt.querySelectorAll('div[hidden]')]
+                const hiddenLines = [...tgt.querySelectorAll('div[style]')]
+                    .filter(el => el.style.display === 'none')
                     .map(n => n.textContent.trim());
                 if(hiddenLines.length){
                     const objs = [];
-                    const sceneIds = [];
-                    let setSceneFound = false;
                     for(const line of hiddenLines){
                         const cmds = parseCommands(line);
                         for(const cmd of cmds){
@@ -645,74 +598,17 @@ async function runSelfTest(){
                                     carryReq: cmd.args.carryReq,
                                 });
                             }else if(cmd.verb === 'setScene'){
-                                setSceneFound = true;
-                                if(cmd.args.items){
-                                    sceneIds.push(...parseItems(cmd.args.items));
-                                }else if(cmd.tail){
-                                    sceneIds.push(...cmd.tail.split(/\s+/).filter(Boolean));
-                                }
+                                aliasMap = buildAliasMap(objs);
+                                aliasMap = Object.assign({}, aliasMap, cachedSynonyms);
+                                aliasMapReady = true;
+                                reScanMessage(node);
+                                return;
                             }
                         }
                     }
-                    if(setSceneFound){
-                        const map = new Map();
-                        for(const obj of objs){
-                            const c = canon(obj.id);
-                            if(!c) continue;
-                            if(!map.has(c)) map.set(c, { id: obj.id, name: obj.name || obj.id, carryReq: obj.carryReq });
-                        }
-                        for(const id of sceneIds){
-                            const c = canon(id);
-                            if(!c) continue;
-                            if(!map.has(c)) map.set(c, { id, name: id, carryReq: 0 });
-                        }
-                        aliasMapNext = buildAliasMap([...map.values()]);
-                        // discard prior synonyms to avoid outdated carryReq
-                        cachedSynonyms = {};
-                        aliasReady = false;
-                        pendingNodes.add(node);
-                        skipHighlight = true;
-                        idle(() => {
-                            aliasMapCurrent = aliasMapNext;
-                            aliasReady = true;
-                            console.log('[Tagger] alias map swapped. New keys:', Object.keys(aliasMapCurrent));
-                            console.log('[Tagger] pendingNodes to rescan:', pendingNodes.size);
-
-                            const lookup = {};
-                            for(const info of Object.values(aliasMapCurrent)){
-                                const id = info.id;
-                                if(!id) continue;
-                                const req = Number(info.carryReq) || 0;
-                                lookup[id] = Math.max(lookup[id] || 0, req);
-                            }
-                            const playerSTR = CoreState?.stats?.strength ?? 10;
-                            document.querySelectorAll('.rpg-item').forEach(sp => {
-                                const id = sp.dataset.itemId;
-                                const req = lookup[id];
-                                if(req === undefined || playerSTR < req){
-                                    sp.replaceWith(document.createTextNode(sp.textContent || ''));
-                                }
-                            });
-
-                            for(const n of pendingNodes){
-                                reScanMessage(n);
-                            }
-                            pendingNodes.clear();
-
-                            reScanMessage(node);
-                        });
-                        // return; // allow highlight pass before alias map completes
-                    }
                 }
-                // Highlights can be applied while aliasReady is false, so don't
-                // exit early when the next alias map hasn't finished building.
-                // if(!aliasReady) return;
-                if(skipHighlight){
-                    console.log('[Tagger] queued node while aliasReady=false →', node.dataset?.mesid);
-                    return;
-                }
+                if(!aliasMapReady) return;
                 setTimeout(() => {
-                    console.log('[Tagger] highlight pass with map keys:', Object.keys(aliasMapCurrent));
                     autoBracket(tgt);
                     tagElement(tgt);
                     fuzzyHighlightElement(tgt);
