@@ -60,7 +60,13 @@ function blankChar() {
 }
 
 function defaultState() {
-    return { characters: {}, clock: { minute: 0 }, sceneObjects: [], meta: { chatId, ver: 2 } };
+    return {
+        characters: {},
+        enemies: {},
+        clock: { minute: 0 },
+        sceneObjects: [],
+        meta: { chatId, ver: 3 },
+    };
 }
 
 function loadState() {
@@ -86,6 +92,13 @@ if ((state.meta?.ver ?? 0) < 2) {
     }
     state.meta = state.meta || {};
     state.meta.ver = 2;
+    persist();
+}
+
+if ((state.meta?.ver ?? 0) < 3) {
+    state.enemies = state.enemies || {};
+    state.meta = state.meta || {};
+    state.meta.ver = 3;
     persist();
 }
 
@@ -162,9 +175,10 @@ function maybeInitStats() {
 
 function normalizeState() {
     state.characters = state.characters || {};
+    state.enemies = state.enemies || {};
     state.clock = state.clock || { minute: 0 };
     state.sceneObjects = state.sceneObjects || [];
-    state.meta = state.meta || { chatId, ver: 2 };
+    state.meta = state.meta || { chatId, ver: 3 };
     if (!state.characters[playerName]) state.characters[playerName] = blankChar();
     maybeInitStats();
 }
