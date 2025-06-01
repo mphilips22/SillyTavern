@@ -1,4 +1,6 @@
 import { debounce } from '../../utils.js';
+import { eventSource, event_types } from '../../../script.js';
+import { getContext } from '../../extensions.js';
 
 /** @typedef {string[]} SceneArray */
 
@@ -10,14 +12,18 @@ export function setDefaultMaxHp(value) {
 
 const ctx = /** @type {any} */ (globalThis.SillyTavern?.getContext?.()) ?? {};
 export const playerName = ctx.character?.name || ctx.persona?.name || 'Player';
-const chatId = ctx.chat?.id || 'default';
-const STORAGE_KEY = `st.rpg.coreState.v1::${chatId}`;
+let chatId = ctx.chat?.id || 'default';
+let STORAGE_KEY = `st.rpg.coreState.v1::${chatId}`;
 
 function blankChar() {
     return { hp: defaultMaxHp, max_hp: defaultMaxHp, mp: 0, max_mp: 100, inventory: [], buffs: {} };
 }
 
-let state = (() => {
+function defaultState() {
+    return { characters: {}, clock: { minute: 0 }, sceneObjects: [], meta: { chatId, ver: 1 } };
+}
+
+function loadState() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
         try {
@@ -26,14 +32,20 @@ let state = (() => {
             console.error('Failed to parse core state:', err);
         }
     }
-    return { characters: {}, clock: { minute: 0 }, sceneObjects: [], meta: { chatId, ver: 1 } };
-})();
+    return defaultState();
+}
 
-state.characters = state.characters || {};
-state.clock = state.clock || { minute: 0 };
-state.sceneObjects = state.sceneObjects || [];
-state.meta = state.meta || { chatId, ver: 1 };
-if (!state.characters[playerName]) state.characters[playerName] = blankChar();
+let state = loadState();
+
+function normalizeState() {
+    state.characters = state.characters || {};
+    state.clock = state.clock || { minute: 0 };
+    state.sceneObjects = state.sceneObjects || [];
+    state.meta = state.meta || { chatId, ver: 1 };
+    if (!state.characters[playerName]) state.characters[playerName] = blankChar();
+}
+
+normalizeState();
 
 function persist() {
     try {
@@ -69,7 +81,8 @@ export function modHP(target, delta, reason) {
 }
 
 export function clearState() {
-    state = { characters: {}, clock: { minute: 0 }, sceneObjects: [], meta: { chatId, ver: 1 } };
+    state = defaultState();
+    normalizeState();
     saveDebounced();
     window.dispatchEvent(new CustomEvent('stateReset', { bubbles: true, composed: true }));
 }
@@ -134,6 +147,16 @@ export function removeItem(target, itemId) {
 }
 
 export function advanceTime() { /* TODO */ }
+
+function onChatChanged() {
+    const context = getContext();
+    chatId = context.chatId || 'default';
+    STORAGE_KEY = `st.rpg.coreState.v1::${chatId}`;
+    state = loadState();
+    normalizeState();
+}
+
+eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
 
 window['getState'] = getState;
 window['modHP'] = modHP;
