@@ -1,4 +1,4 @@
-import { debounce } from '../../utils.js';
+import { debounce, cancelDebounce } from '../../utils.js';
 import {
     chat,
     addOneMessage,
@@ -383,6 +383,12 @@ function onChatChanged() {
 }
 
 eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
+
+// Ensure pending state saves are flushed before the page unloads
+window.addEventListener('beforeunload', () => {
+    cancelDebounce(saveDebounced);
+    persist();
+});
 
 window['getState'] = getState;
 window['getStats'] = getStats;
