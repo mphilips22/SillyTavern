@@ -61,6 +61,8 @@ function createPanel() {
     div.innerHTML = `
         <img class="hud-avatar">
         <div class="hud-name"></div>
+        <div class="hud-lvxp"><span class="hud-lv"></span><progress class="hud-xp" max="0" value="0"></progress></div>
+        <div class="hud-stats"></div>
         <div class="hud-bar"><progress class="hud-hp" max="100" value="0"></progress><div class="hud-value hud-hp-value"></div></div>
         <div class="hud-bar"><progress class="hud-mp" max="100" value="0"></progress><div class="hud-value hud-mp-value"></div></div>
         <details class="hud-scene"><summary>Scene Objects (0)</summary><ul></ul></details>
@@ -94,6 +96,21 @@ function updatePanel(div) {
     const state = rootState.characters?.[CoreState.playerName] || {};
     div.querySelector('.hud-avatar').src = getUserAvatar(user_avatar);
     div.querySelector('.hud-name').textContent = name1;
+    const lvSpan = div.querySelector('.hud-lv');
+    const xpProg = div.querySelector('.hud-xp');
+    if (lvSpan) lvSpan.textContent = `Lv ${state.level ?? 0}`;
+    if (xpProg) {
+        xpProg.max = state.max_xp || state.xp_max || 0;
+        xpProg.value = state.xp || 0;
+    }
+    const statsDiv = div.querySelector('.hud-stats');
+    if (statsDiv) {
+        const str = state.str ?? state.STR ?? 0;
+        const dex = state.dex ?? state.DEX ?? 0;
+        const vit = state.vit ?? state.VIT ?? 0;
+        const mind = state.mind ?? state.MIND ?? 0;
+        statsDiv.textContent = `STR ${str}  DEX ${dex}  VIT ${vit}  MIND ${mind}`;
+    }
     const hp = div.querySelector('.hud-hp');
     const hpVal = div.querySelector('.hud-hp-value');
     if (hp) {
