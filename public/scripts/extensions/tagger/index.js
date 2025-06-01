@@ -622,6 +622,8 @@ async function runSelfTest(){
                 const tgt = node.querySelector('.mes_text') || node;
                 if(!aliasReady){
                     pendingNodes.add(node);
+                    console.log("[Tagger] queued node while aliasReady=false →", node.dataset?.mesid);
+                    return;
                 }
                 const hiddenLines = [...tgt.querySelectorAll('div[hidden]')]
                     .map(n => n.textContent.trim());
@@ -667,6 +669,8 @@ async function runSelfTest(){
                         requestIdleCallback(() => {
                             aliasMapCurrent = aliasMapNext;
                             aliasReady = true;
+                            console.log("[Tagger] alias map swapped. New keys:", Object.keys(aliasMapCurrent));
+                            console.log("[Tagger] pendingNodes to rescan:", pendingNodes.size);
 
                             const lookup = {};
                             for(const info of Object.values(aliasMapCurrent)){
@@ -698,6 +702,7 @@ async function runSelfTest(){
                 // exit early when the next alias map hasn't finished building.
                 // if(!aliasReady) return;
                 setTimeout(() => {
+                    console.log("[Tagger] highlight pass with map keys:", Object.keys(aliasMapCurrent));
                     autoBracket(tgt);
                     tagElement(tgt);
                     fuzzyHighlightElement(tgt);
