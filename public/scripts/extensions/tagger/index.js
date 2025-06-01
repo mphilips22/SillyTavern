@@ -14,7 +14,24 @@ function canon(label){
     return window.RuleVault?.canon?.(label) ?? String(label || '').toLowerCase().replace(/[^a-z0-9]/g,'');
 }
 
-const ADJ_STOP = ['warm','old','shiny','ancient','rusty','broken','cold','small','large'];
+const ADJ_STOP = [
+    'warm',
+    'old',
+    'shiny',
+    'ancient',
+    'rusty',
+    'broken',
+    'cold',
+    'small',
+    'large',
+    // articles and common descriptive adjectives
+    'a',
+    'an',
+    'the',
+    'battered',
+    'woolen',
+    'rough',
+];
 const STOP_SINGLE = ['a','the','you','to','of','in','on','it'];
 const COMMON_WORDS = [
     'skull', 'mug', 'cooking', 'pot', 'weathered', 'crate', 'wooden', 'table', 'fake', 'gem', 'apple',
@@ -245,27 +262,33 @@ function fuzzyHighlightElement(el){
         const spans = [...ngramSpans(text)];
         let replaced = false;
         for(const span of spans){
-            let clean = stripAdj(span.text.toLowerCase());
-            if(!clean) continue;
-            const tokens = clean.split(/\s+/);
+            const raw = span.text.toLowerCase();
+            if(!raw.trim()) continue;
+            const tokens = raw.split(/\s+/);
             const isSingle = tokens.length === 1;
-            if(isSingle){
-                const token = tokens[0];
-                if(token.length < 4) continue;
-                if(STOP_SINGLE.includes(token)) continue;
+
+            const tryList = [];
+            let phrase = raw.trim();
+            tryList.push(phrase);
+            const stripped = stripAdj(phrase);
+            if(stripped !== phrase) tryList.push(stripped);
+            const tail = tokens[tokens.length - 1];
+            if(tail && tail !== phrase) tryList.push(tail);
+
+            let obj = null;
+            for(const key of tryList){
+                obj = aliasMapCurrent[key] || aliasMapCurrent[key.replace(/\s+/g,'')];
+                if(obj) break;
             }
-            let obj = aliasMapCurrent[clean] || aliasMapCurrent[clean.replace(/\s+/g,'')];
-            if(obj && doneIds.has(obj.id)) continue;
-            if(obj && playerSTR < obj.carryReq) obj = null;
-            if(obj){
-                // exact match, no fuzzy check needed
-            }else if(!isSingle){
-                for(const [alias,info] of Object.entries(aliasMapCurrent)){
+            if(obj && (doneIds.has(obj.id) || playerSTR < obj.carryReq)) obj = null;
+            if(!obj && !isSingle){
+                const cmp = stripped;
+                for(const [alias, info] of Object.entries(aliasMapCurrent)){
                     if(doneIds.has(info.id)) continue;
                     if(playerSTR < info.carryReq) continue;
-                    if(nearMatch(clean, alias)){
+                    if(nearMatch(cmp, alias)){
                         obj = info;
-                        cacheSyn(info.id, clean, info.carryReq);
+                        cacheSyn(info.id, cmp, info.carryReq);
                         break;
                     }
                 }
@@ -293,9 +316,9 @@ function fuzzyHighlightElement(el){
 
 function highlightAll(){
     document.querySelectorAll('#chat .mes_text').forEach(el => {
+        fuzzyHighlightElement(el);
         autoBracket(el);
         tagElement(el);
-        fuzzyHighlightElement(el);
     });
 }
 
@@ -305,9 +328,9 @@ function reScanMessage(root){
     root.__taggerRescanned = true;
     doneIds.clear();
     const el = root.querySelector('.mes_text') || root;
+    fuzzyHighlightElement(el);
     autoBracket(el);
     tagElement(el);
-    fuzzyHighlightElement(el);
 }
 
 function setsFromState(){
@@ -366,9 +389,9 @@ function onMessageRendered(id){
     const mes = ctx.chat?.[id];
     if(!mes || mes.is_user) return;
     const el = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
+    fuzzyHighlightElement(el);
     autoBracket(el);
     tagElement(el);
-    fuzzyHighlightElement(el);
     recolorAll();
 }
 
@@ -625,9 +648,9 @@ async function runSelfTest(){
                 // exit early when the next alias map hasn't finished building.
                 // if(!aliasReady) return;
                 setTimeout(() => {
+                    fuzzyHighlightElement(tgt);
                     autoBracket(tgt);
                     tagElement(tgt);
-                    fuzzyHighlightElement(tgt);
                     recolorAll();
                 }, 0);
             });
