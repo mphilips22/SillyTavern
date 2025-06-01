@@ -620,10 +620,9 @@ async function runSelfTest(){
                 if(!node.classList?.contains('mes')) return;
                 if(node.getAttribute('is_user') === 'true') return;
                 const tgt = node.querySelector('.mes_text') || node;
+                let skipHighlight = !aliasReady;
                 if(!aliasReady){
                     pendingNodes.add(node);
-                    console.log("[Tagger] queued node while aliasReady=false →", node.dataset?.mesid);
-                    return;
                 }
                 const hiddenLines = [...tgt.querySelectorAll('div[hidden]')]
                     .map(n => n.textContent.trim());
@@ -666,6 +665,8 @@ async function runSelfTest(){
                         // discard prior synonyms to avoid outdated carryReq
                         cachedSynonyms = {};
                         aliasReady = false;
+                        pendingNodes.add(node);
+                        skipHighlight = true;
                         requestIdleCallback(() => {
                             aliasMapCurrent = aliasMapNext;
                             aliasReady = true;
@@ -701,6 +702,10 @@ async function runSelfTest(){
                 // Highlights can be applied while aliasReady is false, so don't
                 // exit early when the next alias map hasn't finished building.
                 // if(!aliasReady) return;
+                if(skipHighlight){
+                    console.log("[Tagger] queued node while aliasReady=false →", node.dataset?.mesid);
+                    return;
+                }
                 setTimeout(() => {
                     console.log("[Tagger] highlight pass with map keys:", Object.keys(aliasMapCurrent));
                     autoBracket(tgt);
