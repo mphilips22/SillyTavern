@@ -10,6 +10,8 @@ ctx.extensionSettings.features ??= {};
 ctx.extensionSettings.features.tagger ??= { enabled: true };
 const settings = ctx.extensionSettings.features.tagger;
 
+const idle = cb => (window.requestIdleCallback ? requestIdleCallback(cb) : setTimeout(cb, 0));
+
 function canon(label){
     return window.RuleVault?.canon?.(label) ?? String(label || '').toLowerCase().replace(/[^a-z0-9]/g,'');
 }
@@ -579,7 +581,7 @@ async function runSelfTest(){
         const mid = injectAssistant(packet);
         await tick();
         while(!aliasReady){
-            await new Promise(r => requestIdleCallback(r));
+            await new Promise(r => idle(r));
         }
         const pot2 = document.querySelector(`#chat [mesid="${mid}"] .rpg-item[data-item-id="${canon('CookingPot')}"]`);
         assert(pot2, 'Cooking pot should highlight with STR 10');
@@ -670,7 +672,7 @@ async function runSelfTest(){
                         aliasReady = false;
                         pendingNodes.add(node);
                         skipHighlight = true;
-                        requestIdleCallback(() => {
+                        idle(() => {
                             aliasMapCurrent = aliasMapNext;
                             aliasReady = true;
                             console.log('[Tagger] alias map swapped. New keys:', Object.keys(aliasMapCurrent));
