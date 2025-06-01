@@ -148,6 +148,8 @@ export function init() {
     renderSceneObjects(CoreState.getState().sceneObjects);
     window.addEventListener('hpChange', () => updatePanel(panel));
     window.addEventListener('mpChange', () => updatePanel(panel));
+    window.addEventListener('xpChange', () => updatePanel(panel));
+    window.addEventListener('levelUp', () => updatePanel(panel));
     window.addEventListener('itemAdd', () => updatePanel(panel));
     window.addEventListener('itemRemove', () => updatePanel(panel));
     window.addEventListener('stateReset', () => updatePanel(panel));
