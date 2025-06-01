@@ -150,12 +150,13 @@ function* ngramSpans(text, max = 3){
     while((m = re.exec(text))){
         words.push({ word:m[0], index:m.index });
     }
-    for(let i = 0;i < words.length;i++){
-        for(let n = Math.min(max, words.length - i); n >= 1; n--){
+    const maxLen = Math.min(max, words.length);
+    for(let len = maxLen; len >= 1; len--){
+        for(let i = 0; i <= words.length - len; i++){
             const start = words[i].index;
-            const endWord = words[i + n - 1];
+            const endWord = words[i + len - 1];
             const end = endWord.index + endWord.word.length;
-            yield { start,end,text:text.slice(start,end) };
+            yield { start, end, text: text.slice(start, end) };
         }
     }
 }
