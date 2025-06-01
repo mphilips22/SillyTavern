@@ -329,17 +329,26 @@ export function advanceTime() { /* TODO */ }
 export async function runSelfTest() {
     clearState();
     await new Promise(r => requestAnimationFrame(r));
-    const stats = getStats();
+    const baseStats = getStats();
     const pools = getState(playerName);
-    const ok =
-        [stats.str, stats.dex, stats.vit, stats.mind].every(v => v >= 6 && v <= 18) &&
-        stats.level === 1 &&
-        stats.xp === 0 &&
+    let ok =
+        [baseStats.str, baseStats.dex, baseStats.vit, baseStats.mind].every(v => v >= 6 && v <= 18) &&
+        baseStats.level === 1 &&
+        baseStats.xp === 0 &&
         pools.max_hp <= 60 &&
         pools.max_mp <= 50 &&
         pools.max_xp === xpNeeded(1) &&
         pools.hp === pools.max_hp &&
         pools.mp === pools.max_mp;
+
+    addXP(50);
+    const after50 = getStats();
+    ok = ok && after50.level === 1 && after50.xp === 50;
+
+    addXP(150);
+    const afterLevel = getStats();
+    ok = ok && afterLevel.level === 2 && afterLevel.xp === 100;
+
     inject(ok ? '*CoreState self-test passed ✔️*' : '*CoreState self-test failed ❌*', { name: 'SelfTest' });
     return '';
 }
