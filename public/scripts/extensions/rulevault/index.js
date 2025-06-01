@@ -422,7 +422,7 @@ function onMessage(id){
     if(!mes || mes.is_user || mes.is_system) return;
 
     const node = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
-    const hiddenNodes = node ? [...node.querySelectorAll('div[hidden]')] : [];
+    const hiddenNodes = node ? [...node.querySelectorAll('div[hidden], div[style*="display:none"i]')] : [];
     const hiddenText = hiddenNodes.map(n => n.textContent).join('\n');
 
     const raw = mes.mes_html ? stripHtml(mes.mes_html) : mes.mes || '';
@@ -474,7 +474,7 @@ function onMessageRendered(id){
     const node = document.querySelector(`#chat [mesid="${id}"] .mes_text`);
     if(!node) return;
 
-    let hiddenNodes = [...node.querySelectorAll('div[hidden]')];
+    let hiddenNodes = [...node.querySelectorAll('div[hidden], div[style*="display:none"i]')];
     if(!hiddenNodes.length){
         const div = document.createElement('div');
         div.hidden = true;
