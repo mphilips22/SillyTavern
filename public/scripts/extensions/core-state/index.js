@@ -12,11 +12,6 @@ import { SlashCommand } from '../../slash-commands/SlashCommand.js';
 
 /** @typedef {string[]} SceneArray */
 
-let defaultMaxHp = 100;
-
-export function setDefaultMaxHp(value) {
-    defaultMaxHp = value;
-}
 
 const ctx = /** @type {any} */ (globalThis.SillyTavern?.getContext?.()) ?? {};
 export const playerName = ctx.character?.name || ctx.persona?.name || 'Player';
@@ -47,11 +42,7 @@ const inject = globalThis.SillyTavern?.injectAssistant
     });
 
 function blankChar() {
-    return {
-        hp: defaultMaxHp,
-        max_hp: defaultMaxHp,
-        mp: 0,
-        max_mp: 100,
+    const c = {
         inventory: [],
         buffs: {},
         str: 0,
@@ -61,6 +52,8 @@ function blankChar() {
         level: 1,
         xp: 0,
     };
+    recalcDerived(c);
+    return c;
 }
 
 function defaultState() {
@@ -85,6 +78,13 @@ function rollStat() {
     let sum = 2;
     for (let i = 0; i < 4; i++) sum += Math.floor(Math.random() * 4) + 1;
     return sum;
+}
+
+function recalcDerived(char) {
+    char.max_hp = 10 + char.vit;
+    char.max_mp = 5 + char.mind;
+    char.hp = Math.min(char.hp ?? char.max_hp, char.max_hp);
+    char.mp = Math.min(char.mp ?? char.max_mp, char.max_mp);
 }
 
 function maybeInitStats() {
@@ -112,6 +112,14 @@ function maybeInitStats() {
         }
         if (!char.mind) {
             char.mind = rollStat();
+            changed = true;
+        }
+        const hp = char.hp;
+        const mp = char.mp;
+        const max_hp = char.max_hp;
+        const max_mp = char.max_mp;
+        recalcDerived(char);
+        if (char.hp !== hp || char.mp !== mp || char.max_hp !== max_hp || char.max_mp !== max_mp) {
             changed = true;
         }
     }
@@ -277,7 +285,6 @@ window['advanceTime'] = advanceTime;
 window['playerName'] = playerName;
 window['setScene'] = setScene;
 window['setSceneObjects'] = setScene;
-window['setDefaultMaxHp'] = setDefaultMaxHp;
 window['CoreState'] = {
     getState,
     getStats,
@@ -289,7 +296,6 @@ window['CoreState'] = {
     removeItem,
     clearState,
     snapshot,
-    setDefaultMaxHp,
     runSelfTest,
 };
 
