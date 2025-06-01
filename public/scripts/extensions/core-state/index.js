@@ -57,7 +57,7 @@ function blankChar() {
 }
 
 function defaultState() {
-    return { characters: {}, clock: { minute: 0 }, sceneObjects: [], meta: { chatId, ver: 1 } };
+    return { characters: {}, clock: { minute: 0 }, sceneObjects: [], meta: { chatId, ver: 2 } };
 }
 
 function loadState() {
@@ -73,6 +73,18 @@ function loadState() {
 }
 
 let state = loadState();
+
+if ((state.meta?.ver ?? 0) < 2) {
+    const needs = Object.values(state.characters || {}).some((c) => c.max_hp === 100);
+    if (needs) {
+        for (const char of Object.values(state.characters)) {
+            recalcDerived(char);
+        }
+    }
+    state.meta = state.meta || {};
+    state.meta.ver = 2;
+    persist();
+}
 
 function rollStat() {
     let sum = 2;
@@ -130,7 +142,7 @@ function normalizeState() {
     state.characters = state.characters || {};
     state.clock = state.clock || { minute: 0 };
     state.sceneObjects = state.sceneObjects || [];
-    state.meta = state.meta || { chatId, ver: 1 };
+    state.meta = state.meta || { chatId, ver: 2 };
     if (!state.characters[playerName]) state.characters[playerName] = blankChar();
     maybeInitStats();
 }
