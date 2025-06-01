@@ -14,19 +14,12 @@ function canon(label){
     return window.RuleVault?.canon?.(label) ?? String(label || '').toLowerCase().replace(/[^a-z0-9]/g,'');
 }
 
-const ADJ_STOP = ['warm','old','shiny','ancient','rusty','broken','cold','small','large'];
 const STOP_SINGLE = ['a','the','you','to','of','in','on','it'];
 const COMMON_WORDS = [
     'skull', 'mug', 'cooking', 'pot', 'weathered', 'crate', 'wooden', 'table', 'fake', 'gem', 'apple',
     'torch', 'door', 'key', 'sword', 'shield', 'book', 'scroll', 'bottle', 'box', 'bag', 'chair',
     'stone', 'rock', 'rope', 'axe', 'dagger', 'bow', 'arrow', 'staff', 'rod', 'cup', 'bowl', 'plate', 'glass',
 ];
-
-function stripAdj(text){
-    const parts = text.trim().split(/\s+/);
-    while(parts.length && ADJ_STOP.includes(parts[0])) parts.shift();
-    return parts.join(' ');
-}
 
 // eslint-disable-next-line no-unused-vars
 function tokeniseID(id){
@@ -245,45 +238,48 @@ function fuzzyHighlightElement(el){
         const spans = [...ngramSpans(text)];
         let replaced = false;
         for(const span of spans){
-            let clean = stripAdj(span.text.toLowerCase());
-            if(!clean) continue;
-            const tokens = clean.split(/\s+/);
-            const isSingle = tokens.length === 1;
-            if(isSingle){
-                const token = tokens[0];
-                if(token.length < 4) continue;
-                if(STOP_SINGLE.includes(token)) continue;
-            }
-            let obj = aliasMapCurrent[clean] || aliasMapCurrent[clean.replace(/\s+/g,'')];
-            if(obj && doneIds.has(obj.id)) continue;
-            if(obj && playerSTR < obj.carryReq) obj = null;
-            if(obj){
-                // exact match, no fuzzy check needed
-            }else if(!isSingle){
-                for(const [alias,info] of Object.entries(aliasMapCurrent)){
-                    if(doneIds.has(info.id)) continue;
-                    if(playerSTR < info.carryReq) continue;
-                    if(nearMatch(clean, alias)){
-                        obj = info;
-                        cacheSyn(info.id, clean, info.carryReq);
-                        break;
+            const raw = span.text.toLowerCase();
+            const words = raw.split(/\s+/).filter(Boolean);
+            let obj = null;
+            for(let i = 0; i < words.length; i++){
+                const sub = words.slice(i).join(' ');
+                const parts = sub.split(/\s+/);
+                const isSingle = parts.length === 1;
+                if(isSingle){
+                    const token = parts[0];
+                    if(token.length < 4) continue;
+                    if(STOP_SINGLE.includes(token)) continue;
+                }
+                obj = aliasMapCurrent[sub] || aliasMapCurrent[sub.replace(/\s+/g,'')];
+                if(obj && doneIds.has(obj.id)) { obj = null; continue; }
+                if(obj && playerSTR < obj.carryReq) obj = null;
+                if(!obj && !isSingle){
+                    for(const [alias,info] of Object.entries(aliasMapCurrent)){
+                        if(doneIds.has(info.id)) continue;
+                        if(playerSTR < info.carryReq) continue;
+                        if(nearMatch(sub, alias)){
+                            obj = info;
+                            cacheSyn(info.id, sub, info.carryReq);
+                            break;
+                        }
                     }
                 }
+                if(obj){
+                    const range = document.createRange();
+                    range.setStart(node, span.start);
+                    range.setEnd(node, span.end);
+                    const sp = document.createElement('span');
+                    sp.className = 'rpg-item scene';
+                    sp.dataset.itemId = obj.id;
+                    range.surroundContents(sp);
+                    doneIds.add(obj.id);
+                    walker.currentNode = sp.nextSibling;
+                    node = walker.currentNode;
+                    replaced = true;
+                    break;
+                }
             }
-            if(obj){
-                const range = document.createRange();
-                range.setStart(node, span.start);
-                range.setEnd(node, span.end);
-                const sp = document.createElement('span');
-                sp.className = 'rpg-item scene';
-                sp.dataset.itemId = obj.id;
-                range.surroundContents(sp);
-                doneIds.add(obj.id);
-                walker.currentNode = sp.nextSibling;
-                node = walker.currentNode;
-                replaced = true;
-                break;
-            }
+            if(replaced) break;
         }
         if(!replaced){
             node = walker.nextNode();
