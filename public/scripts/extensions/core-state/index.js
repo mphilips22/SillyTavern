@@ -267,10 +267,13 @@ export async function runSelfTest() {
     clearState();
     await new Promise(r => requestAnimationFrame(r));
     const stats = getStats();
+    const pools = getState(playerName);
     const ok =
         [stats.str, stats.dex, stats.vit, stats.mind].every(v => v >= 6 && v <= 18) &&
         stats.level === 1 &&
-        stats.xp === 0;
+        stats.xp === 0 &&
+        pools.max_hp <= 60 &&
+        pools.max_mp <= 50;
     inject(ok ? '*CoreState self-test passed ✔️*' : '*CoreState self-test failed ❌*', { name: 'SelfTest' });
     return '';
 }
