@@ -188,6 +188,7 @@ function nearMatch(a,b){
 let aliasMapCurrent = {};
 let aliasMapNext = {};
 let aliasReady = true;
+const pendingNodes = new Set();
 let cachedSynonyms = {};
 let doneIds = new Set();
 
@@ -619,6 +620,9 @@ async function runSelfTest(){
                 if(!node.classList?.contains('mes')) return;
                 if(node.getAttribute('is_user') === 'true') return;
                 const tgt = node.querySelector('.mes_text') || node;
+                if(!aliasReady){
+                    pendingNodes.add(node);
+                }
                 const hiddenLines = [...tgt.querySelectorAll('div[hidden]')]
                     .map(n => n.textContent.trim());
                 if(hiddenLines.length){
@@ -640,6 +644,12 @@ async function runSelfTest(){
                                 requestIdleCallback(() => {
                                     aliasMapCurrent = aliasMapNext;
                                     aliasReady = true;
+
+                                    for(const n of pendingNodes){
+                                        reScanMessage(n);
+                                    }
+                                    pendingNodes.clear();
+
                                     reScanMessage(node);
                                 });
                                 // return; // allow highlight pass before alias map completes
