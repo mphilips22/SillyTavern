@@ -108,7 +108,7 @@ function parseCommands(line){
             val = val.replace(/<[^>]*>/g,'');
             args[match[1]] = val;
         }
-        cmds.push({ verb, args });
+        cmds.push({ verb, args, tail: argStr.trim() });
     }
     return cmds;
 }
@@ -627,6 +627,8 @@ async function runSelfTest(){
                     .map(n => n.textContent.trim());
                 if(hiddenLines.length){
                     const objs = [];
+                    const sceneIds = [];
+                    let setSceneFound = false;
                     for(const line of hiddenLines){
                         const cmds = parseCommands(line);
                         for(const cmd of cmds){
@@ -637,24 +639,43 @@ async function runSelfTest(){
                                     carryReq: cmd.args.carryReq,
                                 });
                             }else if(cmd.verb === 'setScene'){
-                                aliasMapNext = buildAliasMap(objs);
-                                // discard prior synonyms to avoid outdated carryReq
-                                cachedSynonyms = {};
-                                aliasReady = false;
-                                requestIdleCallback(() => {
-                                    aliasMapCurrent = aliasMapNext;
-                                    aliasReady = true;
-
-                                    for(const n of pendingNodes){
-                                        reScanMessage(n);
-                                    }
-                                    pendingNodes.clear();
-
-                                    reScanMessage(node);
-                                });
-                                // return; // allow highlight pass before alias map completes
+                                setSceneFound = true;
+                                if(cmd.args.items){
+                                    sceneIds.push(...parseItems(cmd.args.items));
+                                }else if(cmd.tail){
+                                    sceneIds.push(...cmd.tail.split(/\s+/).filter(Boolean));
+                                }
                             }
                         }
+                    }
+                    if(setSceneFound){
+                        const map = new Map();
+                        for(const obj of objs){
+                            const c = canon(obj.id);
+                            if(!c) continue;
+                            if(!map.has(c)) map.set(c, { id: obj.id, name: obj.name || obj.id, carryReq: obj.carryReq });
+                        }
+                        for(const id of sceneIds){
+                            const c = canon(id);
+                            if(!c) continue;
+                            if(!map.has(c)) map.set(c, { id, name: id, carryReq: 0 });
+                        }
+                        aliasMapNext = buildAliasMap([...map.values()]);
+                        // discard prior synonyms to avoid outdated carryReq
+                        cachedSynonyms = {};
+                        aliasReady = false;
+                        requestIdleCallback(() => {
+                            aliasMapCurrent = aliasMapNext;
+                            aliasReady = true;
+
+                            for(const n of pendingNodes){
+                                reScanMessage(n);
+                            }
+                            pendingNodes.clear();
+
+                            reScanMessage(node);
+                        });
+                        // return; // allow highlight pass before alias map completes
                     }
                 }
                 // Highlights can be applied while aliasReady is false, so don't
