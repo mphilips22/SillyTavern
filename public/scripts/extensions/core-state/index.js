@@ -43,6 +43,9 @@ const inject = globalThis.SillyTavern?.injectAssistant
 
 const xpNeeded = lvl => lvl * 100;
 
+// TODO: move this XP table to external JSON defaults
+export const ENEMY_XP = { E: 10, D: 25, C: 60, B: 120, A: 250, S: 500 };
+
 function blankChar() {
     const c = {
         inventory: [],
@@ -340,6 +343,47 @@ export function removeItem(target, itemId) {
     }
 }
 
+export function spawnEnemy({ id, name, tier = 'E', hp = 1, portrait = null }) {
+    if (!id) return;
+    state.enemies[id] = { id, name, tier, hp, portrait };
+    saveDebounced();
+    // TODO: portrait handling and HUD integration
+    window.dispatchEvent(new CustomEvent('enemySpawn', { detail: { ...state.enemies[id] } }));
+}
+
+export function modEnemyHP(id, delta) {
+    const enemy = state.enemies[id];
+    if (!enemy) return;
+    enemy.hp += delta;
+    if (enemy.hp <= 0) {
+        grantXPFromTier(enemy.tier);
+        delete state.enemies[id];
+        saveDebounced();
+        window.dispatchEvent(new CustomEvent('enemyDespawn', { detail: { id } }));
+    } else {
+        saveDebounced();
+        window.dispatchEvent(new CustomEvent('enemyHPChange', { detail: { id, delta, hp: enemy.hp } }));
+    }
+}
+
+export function despawnEnemy(id) {
+    if (!state.enemies[id]) return;
+    delete state.enemies[id];
+    saveDebounced();
+    // TODO: HUD integration
+    window.dispatchEvent(new CustomEvent('enemyDespawn', { detail: { id } }));
+}
+
+export function getEnemy(id) {
+    const e = state.enemies[id];
+    return e ? { ...e } : undefined;
+}
+
+export function grantXPFromTier(tier) {
+    const xp = ENEMY_XP[tier] || 0;
+    if (xp > 0) gainXP(xp, 'enemy');
+}
+
 export function advanceTime() { /* TODO */ }
 
 export async function runSelfTest() {
@@ -430,6 +474,11 @@ window['CoreState'] = {
     setSceneObjects: setScene,
     addItem,
     removeItem,
+    spawnEnemy,
+    modEnemyHP,
+    despawnEnemy,
+    getEnemy,
+    grantXPFromTier,
     clearState,
     snapshot,
     runSelfTest,
