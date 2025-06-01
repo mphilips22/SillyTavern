@@ -256,7 +256,11 @@ function handleCommand(cmd){
         const target = cmd.args.target || personaName();
         const amount = parseInt(cmd.args.amount, 10) || 0;
         const reason = cmd.args.reason;
-        CoreState.modHP(target, amount, reason);
+        if(CoreState.getEnemy(target)){
+            CoreState.modEnemyHP(target, amount);
+        }else{
+            CoreState.modHP(target, amount, reason);
+        }
     }else if(cmd.verb  ===  'modMP'){
         const target = cmd.args.target || personaName();
         const amount = parseInt(cmd.args.amount, 10) || 0;
@@ -265,6 +269,11 @@ function handleCommand(cmd){
         const target = cmd.args.target || personaName();
         const amount = parseInt(cmd.args.amount, 10) || 0;
         CoreState.addXP(target, amount);
+    }else if(cmd.verb  ===  'spawn'){
+        CoreState.spawnEnemy(cmd.args);
+        // TODO: SceneGuard cross-checks (phase-2)
+    }else if(cmd.verb  ===  'despawn'){
+        if(cmd.args.id) CoreState.despawnEnemy(cmd.args.id);
     }else if(cmd.verb  ===  'dropItem'){
         if(cmd.args.item){
             const target = cmd.args.target || personaName();
