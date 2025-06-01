@@ -14,7 +14,24 @@ function canon(label){
     return window.RuleVault?.canon?.(label) ?? String(label || '').toLowerCase().replace(/[^a-z0-9]/g,'');
 }
 
-const ADJ_STOP = ['warm','old','shiny','ancient','rusty','broken','cold','small','large'];
+const ADJ_STOP = [
+    'warm',
+    'old',
+    'shiny',
+    'ancient',
+    'rusty',
+    'broken',
+    'cold',
+    'small',
+    'large',
+    // articles and common descriptive adjectives
+    'a',
+    'an',
+    'the',
+    'battered',
+    'woolen',
+    'rough',
+];
 const STOP_SINGLE = ['a','the','you','to','of','in','on','it'];
 const COMMON_WORDS = [
     'skull', 'mug', 'cooking', 'pot', 'weathered', 'crate', 'wooden', 'table', 'fake', 'gem', 'apple',
@@ -183,7 +200,8 @@ function refreshAliasMap(){
     const scene = CoreState.getState().sceneObjects || [];
     const objs = scene.map(id => ({ id, name: id, carryReq: 0 }));
     aliasMapCurrent = buildAliasMap(objs);
-    aliasMapCurrent = Object.assign({}, aliasMapCurrent, cachedSynonyms);
+    // drop stale cached synonyms so carry requirements stay in sync
+    cachedSynonyms = {};
 }
 
 function injectCss(){
@@ -245,16 +263,23 @@ function fuzzyHighlightElement(el){
         const spans = [...ngramSpans(text)];
         let replaced = false;
         for(const span of spans){
-            let clean = stripAdj(span.text.toLowerCase());
-            if(!clean) continue;
-            const tokens = clean.split(/\s+/);
-            const isSingle = tokens.length === 1;
-            if(isSingle){
-                const token = tokens[0];
-                if(token.length < 4) continue;
-                if(STOP_SINGLE.includes(token)) continue;
-            }
+            const raw = span.text.toLowerCase();
+            let clean = raw;
             let obj = aliasMapCurrent[clean] || aliasMapCurrent[clean.replace(/\s+/g,'')];
+            let tokens = clean.split(/\s+/);
+            let isSingle = tokens.length === 1;
+            if(!obj){
+                clean = stripAdj(raw);
+                if(!clean) continue;
+                tokens = clean.split(/\s+/);
+                isSingle = tokens.length === 1;
+                if(isSingle){
+                    const token = tokens[0];
+                    if(token.length < 4) continue;
+                    if(STOP_SINGLE.includes(token)) continue;
+                }
+                obj = aliasMapCurrent[clean] || aliasMapCurrent[clean.replace(/\s+/g,'')];
+            }
             if(obj && doneIds.has(obj.id)) continue;
             if(obj && playerSTR < obj.carryReq) obj = null;
             if(obj){
@@ -609,7 +634,8 @@ async function runSelfTest(){
                                 });
                             }else if(cmd.verb === 'setScene'){
                                 aliasMapNext = buildAliasMap(objs);
-                                aliasMapNext = Object.assign({}, aliasMapNext, cachedSynonyms);
+                                // discard prior synonyms to avoid outdated carryReq
+                                cachedSynonyms = {};
                                 aliasReady = false;
                                 requestIdleCallback(() => {
                                     aliasMapCurrent = aliasMapNext;
