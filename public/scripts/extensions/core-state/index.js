@@ -95,13 +95,20 @@ function rollStat() {
 function recalcDerived(char) {
     char.max_hp = 10 + char.vit;
     char.max_mp = 5 + char.mind;
-    char.hp = Math.min(char.hp ?? char.max_hp, char.max_hp);
-    char.mp = Math.min(char.mp ?? char.max_mp, char.max_mp);
+    if (char.hp === undefined) char.hp = char.max_hp;
+    if (char.mp === undefined) char.mp = char.max_mp;
+    char.hp = Math.min(char.hp, char.max_hp);
+    char.mp = Math.min(char.mp, char.max_mp);
+    if (char.level === 1 && char.xp === 0) {
+        if (char.hp < char.max_hp) char.hp = char.max_hp;
+        if (char.mp < char.max_mp) char.mp = char.max_mp;
+    }
 }
 
 function maybeInitStats() {
     let changed = false;
     for (const char of Object.values(state.characters)) {
+        let rolled = false;
         if (!char.level) {
             char.level = 1;
             changed = true;
@@ -112,18 +119,22 @@ function maybeInitStats() {
         }
         if (!char.str) {
             char.str = rollStat();
+            rolled = true;
             changed = true;
         }
         if (!char.dex) {
             char.dex = rollStat();
+            rolled = true;
             changed = true;
         }
         if (!char.vit) {
             char.vit = rollStat();
+            rolled = true;
             changed = true;
         }
         if (!char.mind) {
             char.mind = rollStat();
+            rolled = true;
             changed = true;
         }
         const hp = char.hp;
@@ -131,6 +142,10 @@ function maybeInitStats() {
         const max_hp = char.max_hp;
         const max_mp = char.max_mp;
         recalcDerived(char);
+        if (rolled) {
+            if (char.hp < char.max_hp) char.hp = char.max_hp;
+            if (char.mp < char.max_mp) char.mp = char.max_mp;
+        }
         if (char.hp !== hp || char.mp !== mp || char.max_hp !== max_hp || char.max_mp !== max_mp) {
             changed = true;
         }
@@ -273,7 +288,9 @@ export async function runSelfTest() {
         stats.level === 1 &&
         stats.xp === 0 &&
         pools.max_hp <= 60 &&
-        pools.max_mp <= 50;
+        pools.max_mp <= 50 &&
+        pools.hp === pools.max_hp &&
+        pools.mp === pools.max_mp;
     inject(ok ? '*CoreState self-test passed ✔️*' : '*CoreState self-test failed ❌*', { name: 'SelfTest' });
     return '';
 }
