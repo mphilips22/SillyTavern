@@ -183,6 +183,9 @@ window['CoreState'] = {
     setDefaultMaxHp,
 };
 
+// Persist the initial state for the current chat
+persist();
+
 /* ===============================================================
    Dev smoke test – paste into browser console after reload
 ================================================================ */
