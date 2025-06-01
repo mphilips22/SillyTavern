@@ -245,6 +245,34 @@ export function modMP(target, delta, reason) {
     }));
 }
 
+export function addXP(target, delta, reason) {
+    const name = ensureChar(target);
+    const c = state.characters[name];
+    const prevLevel = c.level;
+    c.xp = Math.max(0, c.xp + delta);
+    const xpForLevel = lvl => lvl * 100;
+    let leveled = false;
+    while (c.xp >= xpForLevel(c.level)) {
+        c.xp -= xpForLevel(c.level);
+        c.level += 1;
+        recalcDerived(c);
+        leveled = true;
+    }
+    saveDebounced();
+    window.dispatchEvent(new CustomEvent('xpChange', {
+        detail: { target: name, delta, current: c.xp, level: c.level, reason: reason ?? null },
+        bubbles: true,
+        composed: true,
+    }));
+    if (leveled && c.level > prevLevel) {
+        window.dispatchEvent(new CustomEvent('levelUp', {
+            detail: { target: name, level: c.level },
+            bubbles: true,
+            composed: true,
+        }));
+    }
+}
+
 /** @param {string=} target @param {string} itemId */
 export function addItem(target, itemId) {
     const name = ensureChar(target);
@@ -311,6 +339,7 @@ window['modHP'] = modHP;
 window['clearState'] = clearState;
 window['snapshot'] = snapshot;
 window['modMP'] = modMP;
+window['addXP'] = addXP;
 window['addItem'] = addItem;
 window['removeItem'] = removeItem;
 window['advanceTime'] = advanceTime;
@@ -322,6 +351,7 @@ window['CoreState'] = {
     getStats,
     modHP,
     modMP,
+    addXP,
     setScene,
     setSceneObjects: setScene,
     addItem,
