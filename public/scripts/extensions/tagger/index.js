@@ -422,6 +422,10 @@ async function runSelfTest(){
     };
     if(!settings.enabled) return '';
     const tick = () => new Promise(r => requestAnimationFrame(r));
+    const waitHighlight = async () => {
+        await tick();
+        await new Promise(r => setTimeout(r, 0));
+    };
     const events = { sceneUpdate:0, itemAdd:0, itemRemove:0, stateReset:0 };
     const handlers = {
         sceneUpdate: () => events.sceneUpdate++,
@@ -464,7 +468,7 @@ async function runSelfTest(){
         step++;
 
         const id1 = injectAssistant('On the table lies [Apple].');
-        await tick(); // lets Tagger wrap and recolour before assertions run
+        await waitHighlight(); // lets Tagger wrap and recolour before assertions run
         const sp1 = document.querySelector(`#chat [mesid="${id1}"] .rpg-item`);
         assert(
             sp1 && sp1.classList.contains('scene'),
@@ -483,7 +487,7 @@ async function runSelfTest(){
         step++;
 
         const id2 = injectAssistant('You stash [apple] safely.');
-        await tick(); // lets Tagger wrap and recolour before assertions run
+        await waitHighlight(); // lets Tagger wrap and recolour before assertions run
         const sp2 = document.querySelector(`#chat [mesid="${id2}"] .rpg-item`);
         assert(
             sp2 && sp2.classList.contains('inv'),
@@ -507,7 +511,7 @@ async function runSelfTest(){
         setStrict(true);
         CoreState.setScene([]);                         // clear scene
         const fgId1 = injectAssistant('You notice [FakeGem] on a shelf.');
-        await tick();
+        await waitHighlight();
         const fgStrict = document.querySelector(`#chat [mesid="${fgId1}"] .rpg-item[data-item-id="${canon('FakeGem')}"]`);
         assert(fgStrict && fgStrict.classList.contains('unknown'), 'FakeGem should be unknown in strict mode');
         step++;
@@ -516,7 +520,7 @@ async function runSelfTest(){
         setStrict(false);
         CoreState.setScene([canon('FakeGem')]);
         const fgId2 = injectAssistant('The [FakeGem] glitters faintly.');
-        await tick();
+        await waitHighlight();
         const fgLoose = document.querySelector(`#chat [mesid="${fgId2}"] .rpg-item.scene[data-item-id="${canon('FakeGem')}"]`);
         assert(fgLoose, 'FakeGem should be coloured scene once strict is off');
         step++;
@@ -531,7 +535,7 @@ async function runSelfTest(){
         /* 11 – canonical match with junk spacing/case */
         CoreState.setScene([canon('Apple')]);
         injectAssistant('Night falls over the [ APPLE ] again.');
-        await tick();
+        await waitHighlight();
         const weirdApple = document.querySelector('.rpg-item.scene[data-item-id="' + canon('Apple') + '"]');
         assert(weirdApple, 'Bracketed label with spaces/case maps to Apple');
         step++;
@@ -539,7 +543,7 @@ async function runSelfTest(){
         /* 12 – no double-wrap on re-run */
         const beforeCount = document.querySelectorAll('.rpg-item[data-item-id="' + canon('Apple') + '"]').length;
         injectAssistant('You see another [Apple].');
-        await tick();
+        await waitHighlight();
         const after = document.querySelectorAll('.rpg-item[data-item-id="' + canon('Apple') + '"]').length;
         assert(after === beforeCount + 1, 'Exactly one new span added (no nesting)');
         step++;
@@ -547,7 +551,7 @@ async function runSelfTest(){
         /* 13 – fuzzy phrase match */
         CoreState.setScene([canon('SkullMug')]);
         injectAssistant('You lift a warm skull mug from the shelf.');
-        await tick();
+        await waitHighlight();
         const skull = document.querySelector('.rpg-item.scene[data-item-id="' + canon('SkullMug') + '"]');
         assert(skull, 'Fuzzy phrase should map to SkullMug');
         step++;
@@ -555,7 +559,7 @@ async function runSelfTest(){
         /* 14 – natural-name phrase match */
         CoreState.setScene([canon('CookingPot'), canon('WeatheredCrate')]);
         injectAssistant('You lift the cooking pot and set it by the weathered crate.');
-        await tick();
+        await waitHighlight();
         const pot = document.querySelector('.rpg-item.scene[data-item-id="' + canon('CookingPot') + '"]');
         const crate = document.querySelector('.rpg-item.scene[data-item-id="' + canon('WeatheredCrate') + '"]');
         assert(pot && crate, 'Natural phrases should map to CookingPot and WeatheredCrate');
@@ -565,7 +569,7 @@ async function runSelfTest(){
         CoreState.setScene([canon('CookingPot'), canon('WoodenTable')]);
         const base = document.querySelectorAll('.rpg-item').length;
         injectAssistant('A battered cooking pot sits on the wooden table.');
-        await tick();
+        await waitHighlight();
         const afterAll = document.querySelectorAll('.rpg-item').length;
         assert(afterAll === base + 2, 'Cooking pot & wooden table highlighted; "A" ignored');
         step++;
@@ -579,7 +583,7 @@ async function runSelfTest(){
         const hidden = cmds.map(c => `<div hidden>${c}</div>`).join('');
         const packet = hidden + 'You lift the cooking pot but the oak door won\u2019t budge.';
         const mid = injectAssistant(packet);
-        await tick();
+        await waitHighlight();
         while(!aliasReady){
             await new Promise(r => idle(r));
         }
