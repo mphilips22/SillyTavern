@@ -278,6 +278,8 @@ export function addXP(target, delta, reason) {
             composed: true,
         }));
     }
+    // hard-refresh HUD if it exists (covers rare event-miss cases)
+    globalThis.HUDPanel?.update?.();
 }
 
 export function gainXP(delta, reason) {
