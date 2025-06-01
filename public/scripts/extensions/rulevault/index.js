@@ -625,6 +625,30 @@ async function runSmokeTest(){
     return '';
 }
 
+async function enemyFlowSelfTest() {
+    CoreState.clearState();
+
+    onMessage(chat.push({ is_user: false, mes: '::spawn id=TestDummy tier=E hp=10' }) - 1);
+
+    let enemy = CoreState.getEnemy('TestDummy');
+    if (!enemy || enemy.hp !== 10) {
+        throw new Error('enemy spawn failed');
+    }
+
+    onMessage(chat.push({ is_user: false, mes: '::modHP target=TestDummy amount=-15' }) - 1);
+
+    enemy = CoreState.getEnemy('TestDummy');
+    const xp = CoreState.getStats().xp;
+    if (enemy) {
+        throw new Error('enemy not removed');
+    }
+    if (xp !== CoreState.ENEMY_XP.E) {
+        throw new Error('xp mismatch');
+    }
+
+    return 'enemy flow OK';
+}
+
 function init(){
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessage);
     // MESSAGE_RECEIVED fires before the DOM nodes exist. Listen for
@@ -672,6 +696,12 @@ function init(){
         callback: runSmokeTest,
         helpString: 'Run the RuleVault self-test.',
     }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'rulevault-enemytest',
+        callback: enemyFlowSelfTest,
+        helpString: 'Run the RuleVault enemy flow self-test.',
+    }));
 }
 
 if(document.readyState  !==  'loading') init();
@@ -680,6 +710,7 @@ else document.addEventListener('DOMContentLoaded', init, { once:true });
 window.RuleVault = Object.assign(window.RuleVault || {}, {
     getStrict: () => STRICT,
     processHiddenLine,
+    enemyFlowSelfTest,
 });
 
 export {};
