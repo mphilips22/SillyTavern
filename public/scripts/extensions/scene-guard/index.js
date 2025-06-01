@@ -244,11 +244,20 @@ missCount = 0;  // start the streak from scratch
                     m.addedNodes.forEach(node => {
                         if (node.nodeType !== 1) return;
                         if (!node.classList.contains('mes')) return;
-                       requestAnimationFrame(() => processNode(node));
+                        requestAnimationFrame(() => processNode(node));
                     });
                 });
             }).observe(chatBox, { childList: true });
         }
+
+        window.addEventListener('load', () => {
+            const lastGM = [...document.querySelectorAll('#chat .mes_assistant')].pop();
+            const hidden = lastGM ? lastGM.querySelector('div[style][data-original], div[style*="display:none"]') : null;
+            if (!hidden || !hidden.textContent.includes('::setScene')) {
+                showWarn(lastGM ? lastGM.dataset.mesid : '0',
+                    '⚠ State uninitialised \u2014 GM must resend current scene with ::setScene before play continues.');
+            }
+        });
     }
 
     if(document.readyState !== 'loading') init();
