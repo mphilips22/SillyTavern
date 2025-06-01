@@ -280,6 +280,19 @@ export function addXP(target, delta, reason) {
     }
 }
 
+export function gainXP(delta, reason) {
+    return addXP(undefined, delta, reason);
+}
+
+export function modStat(stat, delta) {
+    ensureChar();
+    const c = state.characters[playerName];
+    if (typeof c[stat] !== 'number') c[stat] = 0;
+    c[stat] += delta;
+    recalcDerived(c);
+    saveDebounced();
+}
+
 /** @param {string=} target @param {string} itemId */
 export function addItem(target, itemId) {
     const name = ensureChar(target);
@@ -360,6 +373,7 @@ window['CoreState'] = {
     modHP,
     modMP,
     addXP,
+    gainXP,
     setScene,
     setSceneObjects: setScene,
     addItem,
@@ -367,6 +381,11 @@ window['CoreState'] = {
     clearState,
     snapshot,
     runSelfTest,
+};
+
+window['$rpg'] = {
+    gainXP,
+    modStat,
 };
 
 SlashCommandParser.addCommandObject(
