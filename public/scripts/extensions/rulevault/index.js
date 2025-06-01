@@ -261,6 +261,10 @@ function handleCommand(cmd){
         const target = cmd.args.target || personaName();
         const amount = parseInt(cmd.args.amount, 10) || 0;
         CoreState.modMP(target, amount);
+    }else if(cmd.verb  ===  'gainXP'){
+        const target = cmd.args.target || personaName();
+        const amount = parseInt(cmd.args.amount, 10) || 0;
+        CoreState.addXP(target, amount);
     }else if(cmd.verb  ===  'dropItem'){
         if(cmd.args.item){
             const target = cmd.args.target || personaName();
@@ -299,6 +303,13 @@ function parseCommands(line) {
             }
             val = val.replace(/<[^>]*>/g, '');
             args[match[1]] = val;
+        }
+        if(!Object.keys(args).length && argStr){
+            if(verb === 'gainXP'){
+                let val = argStr.trim();
+                if(val.startsWith('=')) val = val.slice(1);
+                if(val) args.amount = val;
+            }
         }
         cmds.push({ verb, args });
     }
