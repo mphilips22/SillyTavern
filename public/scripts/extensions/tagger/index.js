@@ -668,6 +668,22 @@ async function runSelfTest(){
                             aliasMapCurrent = aliasMapNext;
                             aliasReady = true;
 
+                            const lookup = {};
+                            for(const info of Object.values(aliasMapCurrent)){
+                                const id = info.id;
+                                if(!id) continue;
+                                const req = Number(info.carryReq) || 0;
+                                lookup[id] = Math.max(lookup[id] || 0, req);
+                            }
+                            const playerSTR = CoreState?.stats?.strength ?? 10;
+                            document.querySelectorAll('.rpg-item').forEach(sp => {
+                                const id = sp.dataset.itemId;
+                                const req = lookup[id];
+                                if(req === undefined || playerSTR < req){
+                                    sp.replaceWith(document.createTextNode(sp.textContent || ''));
+                                }
+                            });
+
                             for(const n of pendingNodes){
                                 reScanMessage(n);
                             }
