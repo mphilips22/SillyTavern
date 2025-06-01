@@ -264,7 +264,6 @@ function fuzzyHighlightElement(el){
     for(let node = walker.nextNode(); node;){
         const text = node.nodeValue;
         const spans = [...ngramSpans(text)];
-        let replaced = false;
         for(const span of spans){
             const raw = span.text.toLowerCase();
             let clean = raw;
@@ -307,15 +306,14 @@ function fuzzyHighlightElement(el){
                 sp.dataset.itemId = obj.id;
                 range.surroundContents(sp);
                 doneIds.add(obj.id);
+                // restart scanning this same text node at the position
+                // immediately after the wrapped span
                 walker.currentNode = sp.nextSibling;
                 node = walker.currentNode;
-                replaced = true;
-                break;
+                continue;
             }
         }
-        if(!replaced){
-            node = walker.nextNode();
-        }
+        node = walker.nextNode();
     }
 }
 
