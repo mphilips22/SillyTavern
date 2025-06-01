@@ -41,6 +41,8 @@ const inject = globalThis.SillyTavern?.injectAssistant
         return mid;
     });
 
+const xpNeeded = lvl => lvl * 100;
+
 function blankChar() {
     const c = {
         inventory: [],
@@ -51,6 +53,7 @@ function blankChar() {
         mind: 0,
         level: 1,
         xp: 0,
+        max_xp: xpNeeded(1),
     };
     recalcDerived(c);
     return c;
@@ -115,6 +118,10 @@ function maybeInitStats() {
         }
         if (char.xp === undefined) {
             char.xp = 0;
+            changed = true;
+        }
+        if (char.max_xp === undefined) {
+            char.max_xp = xpNeeded(char.level);
             changed = true;
         }
         if (!char.str) {
@@ -250,14 +257,14 @@ export function addXP(target, delta, reason) {
     const c = state.characters[name];
     const prevLevel = c.level;
     c.xp = Math.max(0, c.xp + delta);
-    const xpForLevel = lvl => lvl * 100;
     let leveled = false;
-    while (c.xp >= xpForLevel(c.level)) {
-        c.xp -= xpForLevel(c.level);
+    while (c.xp >= xpNeeded(c.level)) {
+        c.xp -= xpNeeded(c.level);
         c.level += 1;
         recalcDerived(c);
         leveled = true;
     }
+    c.max_xp = xpNeeded(c.level);
     saveDebounced();
     window.dispatchEvent(new CustomEvent('xpChange', {
         detail: { target: name, delta, current: c.xp, level: c.level, reason: reason ?? null },
@@ -317,6 +324,7 @@ export async function runSelfTest() {
         stats.xp === 0 &&
         pools.max_hp <= 60 &&
         pools.max_mp <= 50 &&
+        pools.max_xp === xpNeeded(1) &&
         pools.hp === pools.max_hp &&
         pools.mp === pools.max_mp;
     inject(ok ? '*CoreState self-test passed ✔️*' : '*CoreState self-test failed ❌*', { name: 'SelfTest' });
