@@ -329,27 +329,45 @@ export function advanceTime() { /* TODO */ }
 export async function runSelfTest() {
     clearState();
     await new Promise(r => requestAnimationFrame(r));
+
+    const fails = [];
+    let step = 1;
+    let pass = 0;
+    const assert = (cond, desc) => {
+        if (!cond) {
+            console.error(`CoreState self-test step ${step} failed: ${desc}`);
+            fails.push(step);
+        } else {
+            pass++;
+        }
+        console.assert(cond, desc);
+        step++;
+    };
+
     const baseStats = getStats();
     const pools = getState(playerName);
-    let ok =
+    assert(
         [baseStats.str, baseStats.dex, baseStats.vit, baseStats.mind].every(v => v >= 6 && v <= 18) &&
-        baseStats.level === 1 &&
-        baseStats.xp === 0 &&
-        pools.max_hp <= 60 &&
-        pools.max_mp <= 50 &&
-        pools.max_xp === xpNeeded(1) &&
-        pools.hp === pools.max_hp &&
-        pools.mp === pools.max_mp;
+            baseStats.level === 1 &&
+            baseStats.xp === 0 &&
+            pools.max_hp <= 60 &&
+            pools.max_mp <= 50 &&
+            pools.max_xp === xpNeeded(1) &&
+            pools.hp === pools.max_hp &&
+            pools.mp === pools.max_mp,
+        'Initial stats valid'
+    );
 
     addXP(50);
     const after50 = getStats();
-    ok = ok && after50.level === 1 && after50.xp === 50;
+    assert(after50.level === 1 && after50.xp === 50, 'addXP(50) adds XP but no level');
 
     addXP(150);
     const afterLevel = getStats();
-    ok = ok && afterLevel.level === 2 && afterLevel.xp === 100;
+    assert(afterLevel.level === 2 && afterLevel.xp === 100, 'addXP(150) levels up');
 
-    inject(ok ? '*CoreState self-test passed ✔️*' : '*CoreState self-test failed ❌*', { name: 'SelfTest' });
+    const msg = `*CoreState self-test: ${pass}/3 checks passed${fails.length ? ' — failed: ' + fails.join(', ') + ' ❌' : ' ✔️'}*`;
+    inject(msg, { name: 'SelfTest' });
     return '';
 }
 
