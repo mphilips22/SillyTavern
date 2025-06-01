@@ -616,12 +616,14 @@ async function runSelfTest(){
                                     aliasReady = true;
                                     reScanMessage(node);
                                 });
-                                return;
+                                // return; // allow highlight pass before alias map completes
                             }
                         }
                     }
                 }
-                if(!aliasReady) return;
+                // Highlights can be applied while aliasReady is false, so don't
+                // exit early when the next alias map hasn't finished building.
+                // if(!aliasReady) return;
                 setTimeout(() => {
                     autoBracket(tgt);
                     tagElement(tgt);
