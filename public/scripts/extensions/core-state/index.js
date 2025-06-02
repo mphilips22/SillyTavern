@@ -5,6 +5,9 @@ import {
     eventSource,
     event_types,
     system_message_types,
+    setExtensionPrompt,
+    extension_prompt_roles,
+    extension_prompt_types,
 } from '../../../script.js';
 import { getContext } from '../../extensions.js';
 import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
@@ -49,8 +52,11 @@ const xpNeeded = lvl => lvl * 100;
 // influence how a character levels up.
 export const ENEMY_XP = { E: 10, D: 25, C: 60, B: 120, A: 250, S: 500 };
 
-function blankChar() {
+function blankChar(name = '') {
     const c = {
+        name,
+        portrait: null,
+        abilities: [],
         inventory: [],
         buffs: {},
         str: 0,
@@ -203,13 +209,26 @@ const saveDebounced = debounce(persist, 250);
 
 function ensureChar(target) {
     const name = target || playerName;
-    if (!state.characters[name]) state.characters[name] = blankChar();
+    if (!state.characters[name]) state.characters[name] = blankChar(name);
     return name;
 }
 
 export function getState(target) {
     if (target) return JSON.parse(JSON.stringify(state.characters[target] || {}));
     return JSON.parse(JSON.stringify(state));
+}
+
+export function getCompanionSnapshot(target) {
+    const root = getState();
+    const char = root.characters?.[target] || {};
+    const scene = (root.sceneObjects || []).join(', ');
+    const inv = (char.inventory || []).join(', ');
+    const abil = (char.abilities || []).join(', ');
+    const lines = [];
+    if (scene) lines.push(`Scene Objects: ${scene}`);
+    if (inv) lines.push(`Inventory: ${inv}`);
+    if (abil) lines.push(`Abilities: ${abil}`);
+    return lines.join('\n');
 }
 
 export function getStats(target) {
@@ -449,6 +468,11 @@ function onChatChanged() {
 }
 
 eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
+eventSource.on(event_types.GROUP_MEMBER_DRAFTED, (id) => {
+    if (id === playerName) return;
+    const snap = getCompanionSnapshot(id);
+    setExtensionPrompt(`corestate-${id}`, snap, extension_prompt_types.IN_PROMPT, 0, false, extension_prompt_roles.SYSTEM);
+});
 
 // Ensure pending state saves are flushed before the page unloads
 window.addEventListener('beforeunload', () => {
@@ -487,6 +511,7 @@ window['CoreState'] = {
     grantXPFromTier,
     clearState,
     snapshot,
+    getCompanionSnapshot,
     runSelfTest,
 };
 
