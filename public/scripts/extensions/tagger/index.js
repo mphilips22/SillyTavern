@@ -158,21 +158,45 @@ function distance(a,b){
     return { dist,ratio };
 }
 
+const SYN_CACHE_MAX_SIZE = 100;
+const SYN_CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+
 let aliasMap = {};
-let cachedSynonyms = {};
+let cachedSynonyms = new Map();
 let aliasMapReady = false;
 let doneIds = new Set();
 
+function purgeCachedSynonyms(){
+    const now = Date.now();
+    for(const [key, val] of cachedSynonyms){
+        if(now - val.time > SYN_CACHE_MAX_AGE_MS){
+            cachedSynonyms.delete(key);
+            delete aliasMap[key];
+        }
+    }
+    while(cachedSynonyms.size > SYN_CACHE_MAX_SIZE){
+        const oldest = cachedSynonyms.keys().next().value;
+        cachedSynonyms.delete(oldest);
+        delete aliasMap[oldest];
+    }
+}
+
 function cacheSyn(id, phrase, carryReq = 0){
-    cachedSynonyms[phrase] = { id, carryReq };
+    const entry = { id, carryReq, time: Date.now() };
+    if(cachedSynonyms.has(phrase)) cachedSynonyms.delete(phrase);
+    cachedSynonyms.set(phrase, entry);
     aliasMap[phrase] = { id, carryReq };
+    purgeCachedSynonyms();
 }
 
 function refreshAliasMap(){
+    purgeCachedSynonyms();
     const scene = CoreState.getState().sceneObjects || [];
     const objs = scene.map(id => ({ id, name: id, carryReq: 0 }));
     aliasMap = buildAliasMap(objs);
-    aliasMap = Object.assign({}, aliasMap, cachedSynonyms);
+    for(const [p, { id, carryReq }] of cachedSynonyms){
+        aliasMap[p] = { id, carryReq };
+    }
 }
 
 function injectCss(){
@@ -575,7 +599,7 @@ async function runSelfTest(){
     window.addEventListener('sceneUpdate', () => { refreshAliasMap(); recolorAll(); });
     window.addEventListener('itemAdd', recolorAll);
     window.addEventListener('itemRemove', recolorAll);
-    window.addEventListener('stateReset', () => { cachedSynonyms = {}; refreshAliasMap(); recolorAll(); });
+    window.addEventListener('stateReset', () => { cachedSynonyms = new Map(); refreshAliasMap(); recolorAll(); });
     new MutationObserver(muts=>{
         muts.forEach(m=>{
             m.addedNodes.forEach(node=>{
@@ -599,7 +623,10 @@ async function runSelfTest(){
                                 });
                             }else if(cmd.verb === 'setScene'){
                                 aliasMap = buildAliasMap(objs);
-                                aliasMap = Object.assign({}, aliasMap, cachedSynonyms);
+                                purgeCachedSynonyms();
+                                for(const [p,{ id, carryReq }] of cachedSynonyms){
+                                    aliasMap[p] = { id, carryReq };
+                                }
                                 aliasMapReady = true;
                                 reScanMessage(node);
                                 return;
