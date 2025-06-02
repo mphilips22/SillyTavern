@@ -305,11 +305,19 @@ function fuzzyHighlightElement(el){
     }
 }
 
-function highlightAll(){
-    document.querySelectorAll('#chat .mes_text').forEach(el => {
+let processedMessageIds = new Set();
+
+function highlightAll(force = false){
+    const messages = document.querySelectorAll('#chat .mes');
+    messages.forEach(mes => {
+        const mid = mes.getAttribute('mesid');
+        if(!mid) return;
+        if(!force && processedMessageIds.has(mid)) return;
+        const el = mes.querySelector('.mes_text');
         autoBracket(el);
         tagElement(el);
         fuzzyHighlightElement(el);
+        processedMessageIds.add(mid);
     });
 }
 
@@ -321,6 +329,8 @@ function reScanMessage(root){
     autoBracket(el);
     tagElement(el);
     fuzzyHighlightElement(el);
+    const mid = root.getAttribute?.('mesid');
+    if(mid) processedMessageIds.add(mid);
 }
 
 function setsFromState(){
@@ -382,6 +392,7 @@ function onMessageRendered(id){
     autoBracket(el);
     tagElement(el);
     fuzzyHighlightElement(el);
+    processedMessageIds.add(String(id));
     recolorAll();
 }
 
@@ -593,13 +604,24 @@ async function runSelfTest(){
     if(!settings.enabled) return;
     injectCss();
     refreshAliasMap();
-    highlightAll();
+    highlightAll(true);
     recolorAll();
     eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, onMessageRendered);
-    window.addEventListener('sceneUpdate', () => { refreshAliasMap(); recolorAll(); });
-    window.addEventListener('itemAdd', recolorAll);
-    window.addEventListener('itemRemove', recolorAll);
-    window.addEventListener('stateReset', () => { cachedSynonyms = new Map(); refreshAliasMap(); recolorAll(); });
+    window.addEventListener('sceneUpdate', () => {
+        refreshAliasMap();
+        processedMessageIds.clear();
+        highlightAll(true);
+        recolorAll();
+    });
+    window.addEventListener('itemAdd', () => { recolorAll(); });
+    window.addEventListener('itemRemove', () => { recolorAll(); });
+    window.addEventListener('stateReset', () => {
+        cachedSynonyms = new Map();
+        refreshAliasMap();
+        processedMessageIds.clear();
+        highlightAll(true);
+        recolorAll();
+    });
     const chatContainer = document.getElementById('chat');
     new MutationObserver(muts=>{
         muts.forEach(m=>{
@@ -640,6 +662,7 @@ async function runSelfTest(){
                     autoBracket(tgt);
                     tagElement(tgt);
                     fuzzyHighlightElement(tgt);
+                    processedMessageIds.add(node.getAttribute('mesid'));
                     recolorAll();
                 }, 0);
             });
