@@ -600,6 +600,7 @@ async function runSelfTest(){
     window.addEventListener('itemAdd', recolorAll);
     window.addEventListener('itemRemove', recolorAll);
     window.addEventListener('stateReset', () => { cachedSynonyms = new Map(); refreshAliasMap(); recolorAll(); });
+    const chatContainer = document.getElementById('chat');
     new MutationObserver(muts=>{
         muts.forEach(m=>{
             m.addedNodes.forEach(node=>{
@@ -643,7 +644,7 @@ async function runSelfTest(){
                 }, 0);
             });
         });
-    }).observe(document.body,{ childList:true,subtree:true });
+    }).observe(chatContainer,{ childList:true });
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name:'tagger-selftest',
         callback: runSelfTest,
