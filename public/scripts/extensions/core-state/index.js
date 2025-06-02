@@ -359,7 +359,8 @@ export function spawnEnemy({ id, name, tier = 'E', hp = 1, portrait = null }) {
 export function modEnemyHP(id, delta) {
     const enemy = state.enemies[id];
     if (!enemy) return;
-    enemy.hp += delta;
+    // spawnEnemy already normalizes hp to a number
+    enemy.hp = Number(enemy.hp) + delta;
     if (enemy.hp <= 0) {
         grantXPFromTier(enemy.tier);
         delete state.enemies[id];
