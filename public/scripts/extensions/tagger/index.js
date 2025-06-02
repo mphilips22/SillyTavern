@@ -313,7 +313,8 @@ function fuzzyHighlightElement(el){
                 range.setStart(node, span.start);
                 range.setEnd(node, span.end);
                 const sp = document.createElement('span');
-                sp.className = 'rpg-item scene';
+                const cls = obj.type === 'enemy' ? 'tag-enemy' : 'scene';
+                sp.className = `rpg-item ${cls}`;
                 sp.dataset.itemId = obj.id;
                 range.surroundContents(sp);
                 doneIds.add(obj.id);
