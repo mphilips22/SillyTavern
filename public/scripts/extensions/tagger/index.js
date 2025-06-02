@@ -610,6 +610,15 @@ async function runSelfTest(){
         assert(!door2, 'Oak door should not highlight when carryReq unmet');
         step++;
 
+        /* 18 – enemy tagging */
+        CoreState.spawnEnemy({ id: 'TestOrc', name: 'TestOrc', tier: 'D', hp: 8 });
+        refreshAliasMap();
+        const eMid = injectAssistant('The TestOrc snarls.');
+        await tick();
+        const eCount = document.querySelectorAll(`#chat [mesid="${eMid}"] span.tag-enemy`).length;
+        assert(eCount === 1, 'TestOrc enemy should highlight exactly once');
+        step++;
+
         assert(
             fails.length === 0,
             'No test steps should have failed',
@@ -621,7 +630,7 @@ async function runSelfTest(){
         for(const [ev,fn] of Object.entries(handlers)) window.removeEventListener(ev, fn);
     }
 
-    assistantBubble(`*Tagger self-test: ${pass} / 17 checks passed${fails.length ? ' — failed: ' + fails.join(', ') : ' ✔️'}*`);
+    assistantBubble(`*Tagger self-test: ${pass} / 18 checks passed${fails.length ? ' — failed: ' + fails.join(', ') : ' ✔️'}*`);
     return '';
 }
 
