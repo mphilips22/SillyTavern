@@ -647,6 +647,14 @@ async function runSelfTest(){
         highlightAll(true);
         recolorAll();
     });
+    window.addEventListener('enemySpawn', () => {
+        refreshAliasMap();
+        highlightAll(true);
+    });
+    window.addEventListener('enemyDespawn', () => {
+        refreshAliasMap();
+        highlightAll(true);
+    });
     window.addEventListener('itemAdd', () => { recolorAll(); });
     window.addEventListener('itemRemove', () => { recolorAll(); });
     window.addEventListener('stateReset', () => {
