@@ -8,6 +8,7 @@ const ctx = globalThis.SillyTavern?.getContext?.() ?? {};
 ctx.extensionSettings ??= {};
 ctx.extensionSettings.features ??= {};
 ctx.extensionSettings.features.tagger ??= { enabled: true };
+ctx.extensionSettings.features.tagger.maxRescan ??= 10;
 const settings = ctx.extensionSettings.features.tagger;
 
 function canon(label){
@@ -333,7 +334,8 @@ function fuzzyHighlightElement(el){
 let processedMessageIds = new Set();
 
 function highlightAll(force = false){
-    const messages = document.querySelectorAll('#chat .mes');
+    const allMessages = Array.from(document.querySelectorAll('#chat .mes'));
+    const messages = allMessages.slice(-settings.maxRescan);
     messages.forEach(mes => {
         const mid = mes.getAttribute('mesid');
         if(!mid) return;
