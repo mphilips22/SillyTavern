@@ -2,3 +2,5 @@
 .rpg-item.inv    { color:#8f8; }
 .rpg-item.scene  { color:#bbb; }
 .rpg-item.unknown{ color:#f88; }
+
+.tag-enemy { color:#ff6666; font-weight:600; cursor:help; }
