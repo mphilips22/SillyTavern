@@ -66,7 +66,8 @@ function createPanel() {
         <div class="hud-bar"><progress class="hud-hp" max="100" value="0"></progress><div class="hud-value hud-hp-value"></div></div>
         <div class="hud-bar"><progress class="hud-mp" max="100" value="0"></progress><div class="hud-value hud-mp-value"></div></div>
         <details class="hud-scene"><summary>Scene Objects (0)</summary><ul></ul></details>
-        <details class="hud-inv"><summary>Inventory (0)</summary><ul></ul></details>`;
+        <details class="hud-inv"><summary>Inventory (0)</summary><ul></ul></details>
+        <details class="hud-foes"><summary>Enemies (0)</summary><ul></ul></details>`;
     document.body.prepend(div);
     makeDraggable(div);
     return div;
@@ -89,6 +90,29 @@ function renderSceneObjects(arr = []) {
         sceneUl.appendChild(li);
     });
     sceneSum.textContent = `Scene Objects (${arr.length})`;
+}
+
+function renderEnemies(map = {}) {
+    const foeUl = document.querySelector('.hud-panel .hud-foes ul');
+    const foeSum = document.querySelector('.hud-panel .hud-foes summary');
+    if (!foeUl || !foeSum) return;
+    foeUl.innerHTML = '';
+    const arr = Object.values(map);
+    if (arr.length === 0) {
+        foeUl.style.display = 'none';
+        foeSum.textContent = 'Enemies (0)';
+        return;
+    }
+    foeUl.style.display = '';
+    arr.forEach(e => {
+        const li = document.createElement('li');
+        const name = e.name || e.id;
+        const hp = e.hp ?? 0;
+        const max = e.maxHP ?? e.max_hp ?? 0;
+        li.textContent = `${name} \u2013 ${hp} / ${max} HP`;
+        foeUl.appendChild(li);
+    });
+    foeSum.textContent = `Enemies (${arr.length})`;
 }
 
 function updatePanel(div) {
@@ -137,6 +161,7 @@ function updatePanel(div) {
         invSum.textContent = `Inventory (${(state.inventory || []).length})`;
     }
     renderSceneObjects(rootState.sceneObjects || []);
+    renderEnemies(rootState.enemies || {});
 }
 
 export function init() {
@@ -156,6 +181,8 @@ export function init() {
     window.addEventListener('sceneUpdate', e => {
         renderSceneObjects(e.detail.items);
     });
+    ['enemySpawn','enemyHPChange','enemyDespawn'].forEach(ev =>
+        window.addEventListener(ev, () => updatePanel(panel)));
     globalThis.HUDPanel = { element: panel, update: () => updatePanel(panel) };
 }
 
@@ -174,4 +201,7 @@ setScene(['Torch','Key']);
 → HUD shows 2 scene objects.
 setScene(['Ruby']);
 → HUD updates to 1 scene object.
+spawnEnemy({id:'Dummy',name:'Dummy',tier:'E',hp:10,maxHP:10});
+modEnemyHP('Dummy',-5);  → HUD updates to 5/10
+modEnemyHP('Dummy',-6);  → Dummy vanishes, count drops to 0
 */
