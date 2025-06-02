@@ -121,6 +121,30 @@ function buildAliasMap(objs = []){
             if(!map[a]) map[a] = { id, carryReq };
         }
     }
+
+    // include enemies in alias map
+    for(const enemy of Object.values(CoreState.getState().enemies || {})){
+        const id = canon(enemy.id);
+        if(!id) continue;
+        const aliasSet = new Set();
+        for(const raw of [enemy.id, enemy.name]){
+            if(!raw) continue;
+            const tokens = splitCanonicalTokens(raw);
+            const phrase = tokens.join(' ').toLowerCase();
+            const last = tokens[tokens.length - 1];
+            if(phrase){
+                aliasSet.add(phrase);
+                aliasSet.add(phrase.replace(/\s+/g,''));
+            }
+            if(last && last.length >= 4 && !STOP_SINGLE.includes(last)){
+                aliasSet.add(last.toLowerCase());
+            }
+        }
+        aliasSet.add(id.toLowerCase());
+        for(const a of aliasSet){
+            if(!map[a]) map[a] = { id, type: 'enemy' };
+        }
+    }
     return map;
 }
 
