@@ -7,6 +7,25 @@ import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
 import * as CoreState from '../core-state/index.js';
 
 const TxStore = {};
+const TxHistory = [];
+const TX_TTL_MS = 1000 * 60 * 5; // 5 minutes
+const TX_MAX_ENTRIES = 50;
+
+function cleanupTxStore() {
+    const now = Date.now();
+    for (let i = TxHistory.length - 1; i >= 0; i--) {
+        const id = TxHistory[i];
+        const entry = TxStore[id];
+        if (!entry || now - entry.timestamp > TX_TTL_MS) {
+            delete TxStore[id];
+            TxHistory.splice(i, 1);
+        }
+    }
+    while (TxHistory.length > TX_MAX_ENTRIES) {
+        const oldId = TxHistory.shift();
+        delete TxStore[oldId];
+    }
+}
 
 function ensureSettings() {
     const ctx = /** @type {any} */ (globalThis.SillyTavern?.getContext?.()) ?? {};
@@ -103,7 +122,9 @@ export function autoRoll(expr, patch = null) {
     const msgId = ctx.chat?.lastAssistantMsgId ?? mid;
     if (patch) {
         applyPatch(patch);
-        TxStore[msgId] = { patch, invertPatch: invert(patch) };
+        TxStore[msgId] = { patch, invertPatch: invert(patch), timestamp: Date.now() };
+        TxHistory.push(msgId);
+        cleanupTxStore();
     }
     window.dispatchEvent(
         new CustomEvent('diceRoll', {
@@ -118,6 +139,8 @@ export function undoTx(id) {
     if (!tx) return;
     applyPatch(tx.invertPatch);
     delete TxStore[id];
+    const idx = TxHistory.indexOf(id);
+    if (idx !== -1) TxHistory.splice(idx, 1);
 }
 
 (function init() {
