@@ -67,7 +67,8 @@ function createPanel() {
         <div class="hud-bar"><progress class="hud-mp" max="100" value="0"></progress><div class="hud-value hud-mp-value"></div></div>
         <details class="hud-scene"><summary>Scene Objects (0)</summary><ul></ul></details>
         <details class="hud-inv"><summary>Inventory (0)</summary><ul></ul></details>
-        <details class="hud-foes"><summary>Enemies (0)</summary><ul></ul></details>`;
+        <details class="hud-foes"><summary>Enemies (0)</summary><ul></ul></details>
+        <div class="hud-companions"></div>`;
     document.body.prepend(div);
     makeDraggable(div);
     return div;
@@ -113,6 +114,63 @@ function renderEnemies(map = {}) {
         foeUl.appendChild(li);
     });
     foeSum.textContent = `Enemies (${arr.length})`;
+}
+
+function createCompanionCard(name) {
+    const card = document.createElement('div');
+    card.className = 'companion-card';
+    card.dataset.name = name;
+    card.innerHTML = `
+        <img class="comp-avatar">
+        <div class="comp-name"></div>
+        <div class="hud-bar"><progress class="comp-hp" max="100" value="0"></progress><div class="hud-value comp-hp-value"></div></div>
+        <details class="comp-inv"><summary>Inventory (0)</summary><ul></ul></details>`;
+    return card;
+}
+
+function updateCompanionCard(card, state) {
+    card.querySelector('.comp-avatar').src = state.portrait || '';
+    card.querySelector('.comp-name').textContent = state.name || card.dataset.name;
+    const hp = card.querySelector('.comp-hp');
+    const hpVal = card.querySelector('.comp-hp-value');
+    if (hp) {
+        hp.max = state.max_hp || 0;
+        hp.value = state.hp || 0;
+        hpVal.textContent = `${state.hp ?? 0} / ${state.max_hp ?? 0}`;
+    }
+    const invUl = card.querySelector('.comp-inv ul');
+    const invSum = card.querySelector('.comp-inv summary');
+    if (invUl && invSum) {
+        invUl.innerHTML = '';
+        (state.inventory || []).forEach(it => {
+            const li = document.createElement('li');
+            li.textContent = it;
+            invUl.appendChild(li);
+        });
+        invSum.textContent = `Inventory (${(state.inventory || []).length})`;
+    }
+}
+
+function renderCompanions(div, characters) {
+    const container = div.querySelector('.hud-companions');
+    if (!container) return;
+    const names = Object.keys(characters).filter(n => n !== CoreState.playerName);
+    const existing = [...container.querySelectorAll('.companion-card')].map(c => c.dataset.name);
+    for (const name of existing) {
+        if (!names.includes(name)) {
+            const node = container.querySelector(`.companion-card[data-name="${name}"]`);
+            if (node) node.remove();
+        }
+    }
+    for (const name of names) {
+        const state = characters[name] || {};
+        let card = container.querySelector(`.companion-card[data-name="${name}"]`);
+        if (!card) {
+            card = createCompanionCard(name);
+            container.appendChild(card);
+        }
+        updateCompanionCard(card, state);
+    }
 }
 
 function updatePanel(div) {
@@ -162,6 +220,7 @@ function updatePanel(div) {
     }
     renderSceneObjects(rootState.sceneObjects || []);
     renderEnemies(rootState.enemies || {});
+    renderCompanions(div, rootState.characters || {});
 }
 
 export function init() {
