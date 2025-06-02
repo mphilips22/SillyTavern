@@ -348,7 +348,9 @@ export function removeItem(target, itemId) {
 
 export function spawnEnemy({ id, name, tier = 'E', hp = 1, portrait = null }) {
     if (!id) return;
-    state.enemies[id] = { id, name, tier, hp, portrait };
+    hp = parseInt(hp, 10) || 0;
+    tier = String(tier || '').toUpperCase();
+    state.enemies[id] = { id, name, tier, hp, maxHP: hp, portrait, abilities: [] };
     saveDebounced();
     // TODO: portrait handling and HUD integration
     window.dispatchEvent(new CustomEvent('enemySpawn', { detail: { ...state.enemies[id] } }));
